@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+body {
+  margin: 0;
+  font-family:
+    Inter,
+    "Noto Sans TC",
+    "Microsoft JhengHei",
+    sans-serif;
+  background: #f7f9fc;
+  color: #1f2937;
+}
+
+* {
+  box-sizing: border-box;
+}
+input[type="range"] {
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: currentColor;
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: currentColor;
+  cursor: pointer;
+}
