@@ -41,7 +41,7 @@ function History() {
                 }
 
                 const response = await fetch(
-                    `http://localhost:3000/api/checkin/${userId}`
+                    `${import.meta.env.VITE_API_URL}/api/checkin/${userId}`
                 );
 
                 const data = await response.json();
@@ -72,9 +72,7 @@ function History() {
                 if (data.data.length > 0) {
                     setAnalysisLoading(true);
 
-                    const analysisResponse = await fetch(
-                        "http://localhost:3000/api/analysis",
-                        {
+                    const analysisResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/analysis`, {
                             method: "POST",
                             headers: {
                                 "Content-Type": "application/json",
@@ -83,30 +81,30 @@ function History() {
                                 completedDays: data.data.length,
 
                                 averageMood: (
-                                    data.data.reduce(
+                                    recent7Days.reduce(
                                         (sum: number, record: CheckinRecord) =>
                                             sum + record.mood_score,
                                         0
-                                    ) / data.data.length
+                                    ) / recent7Days.length
                                 ).toFixed(1),
 
                                 averageStress: (
-                                    data.data.reduce(
+                                    recent7Days.reduce(
                                         (sum: number, record: CheckinRecord) =>
                                             sum + record.stress_score,
                                         0
-                                    ) / data.data.length
+                                    ) / recent7Days.length
                                 ).toFixed(1),
 
                                 averageSleep: (
-                                    data.data.reduce(
+                                    recent7Days.reduce(
                                         (sum: number, record: CheckinRecord) =>
                                             sum + record.sleep_score,
                                         0
-                                    ) / data.data.length
+                                    ) / recent7Days.length
                                 ).toFixed(1),
 
-                                recentRecords: data.data.map((record: CheckinRecord) => ({
+                                recentRecords: recent7Days.map((record: CheckinRecord) => ({
                                     date: record.checkin_date,
                                     mood: record.mood_score,
                                     stress: record.stress_score,
