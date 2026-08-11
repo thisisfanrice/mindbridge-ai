@@ -6,6 +6,7 @@ const cors = require("cors");
 const checkinRouter = require("./routes/checkin");
 const userRoutes = require("./routes/users");
 const analysisRoutes = require("./routes/analysis");
+const profileRoutes = require("./routes/profile");
 
 const app = express();
 
@@ -25,6 +26,7 @@ app.get("/api/health", (req, res) => {
 app.use("/api/checkin", checkinRouter);
 app.use("/api/users", userRoutes);
 app.use("/api/analysis", analysisRoutes);
+app.use("/api/profile", profileRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);
