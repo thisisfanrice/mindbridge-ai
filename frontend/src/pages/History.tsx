@@ -410,8 +410,6 @@ function History() {
                 return {
                     date: `${date.getMonth() + 1}/${date.getDate()}`,
 
-                    fullDate: key,
-
                     mood:
                         record?.mood_score ??
                         null,
