@@ -4,7 +4,86 @@ const pool = require("../db");
 const router = express.Router();
 
 /**
- * 新增 / 更新今日 Check-in
+ * 數字欄位正規化
+ */
+function normalizeNumber(value) {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const number = Number(value);
+
+  return Number.isFinite(number) ? number : NaN;
+}
+
+/**
+ * 文字欄位正規化
+ */
+function normalizeText(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
+ * 驗證 Check-in 欄位
+ */
+function validateCheckin({
+  moodScore,
+  stressScore,
+  sleepScore,
+  energyScore,
+  inputType,
+}) {
+  if (
+    moodScore !== null &&
+    (!Number.isInteger(moodScore) ||
+      moodScore < 1 ||
+      moodScore > 6)
+  ) {
+    return "moodScore must be between 1 and 6";
+  }
+
+  if (
+    stressScore !== null &&
+    (!Number.isInteger(stressScore) ||
+      stressScore < 1 ||
+      stressScore > 10)
+  ) {
+    return "stressScore must be between 1 and 10";
+  }
+
+  if (
+    sleepScore !== null &&
+    (!Number.isInteger(sleepScore) ||
+      sleepScore < 1 ||
+      sleepScore > 10)
+  ) {
+    return "sleepScore must be between 1 and 10";
+  }
+
+  if (
+    energyScore !== null &&
+    (!Number.isInteger(energyScore) ||
+      energyScore < 1 ||
+      energyScore > 5)
+  ) {
+    return "energyScore must be between 1 and 5";
+  }
+
+  if (!["text", "voice"].includes(inputType)) {
+    return "inputType must be text or voice";
+  }
+
+  return null;
+}
+
+/**
+ * 新增 / 更新今天的 Check-in
  */
 router.post("/", async (req, res) => {
   try {
@@ -13,7 +92,9 @@ router.post("/", async (req, res) => {
       moodScore,
       stressScore,
       sleepScore,
+      energyScore,
       note,
+      inputType,
     } = req.body;
 
     if (!userId) {
@@ -23,127 +104,112 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const normalizedMood =
-      moodScore === undefined || moodScore === null
-        ? null
-        : moodScore;
+    const normalizedMood = normalizeNumber(moodScore);
+    const normalizedStress = normalizeNumber(stressScore);
+    const normalizedSleep = normalizeNumber(sleepScore);
+    const normalizedEnergy = normalizeNumber(energyScore);
 
-    const normalizedStress =
-      stressScore === undefined || stressScore === null
-        ? null
-        : stressScore;
+    const normalizedNote = normalizeText(note);
 
-    const normalizedSleep =
-      sleepScore === undefined || sleepScore === null
-        ? null
-        : sleepScore;
+    const normalizedInputType =
+      inputType === "voice" ? "voice" : "text";
 
-    const normalizedNote =
-      typeof note === "string" && note.trim().length > 0
-        ? note.trim()
-        : null;
+    const validationError = validateCheckin({
+      moodScore: normalizedMood,
+      stressScore: normalizedStress,
+      sleepScore: normalizedSleep,
+      energyScore: normalizedEnergy,
+      inputType: normalizedInputType,
+    });
 
-    const hasAnyCheckinData =
+    if (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError,
+      });
+    }
+
+    /*
+     * 至少要填一個實際內容。
+     * inputType 本身不算 Check-in 內容。
+     */
+    const hasContent =
       normalizedMood !== null ||
       normalizedStress !== null ||
       normalizedSleep !== null ||
+      normalizedEnergy !== null ||
       normalizedNote !== null;
 
-    if (!hasAnyCheckinData) {
+    if (!hasContent) {
       return res.status(400).json({
         success: false,
-        message: "Please provide at least one check-in item",
+        message: "Please complete at least one check-in item",
       });
     }
 
-    if (
-      normalizedMood !== null &&
-      (
-        !Number.isInteger(normalizedMood) ||
-        normalizedMood < 1 ||
-        normalizedMood > 6
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "moodScore must be an integer between 1 and 6",
-      });
-    }
+    const result = await pool.query(
+      `
+        INSERT INTO daily_checkins (
+          user_id,
+          mood_score,
+          stress_score,
+          sleep_score,
+          energy_score,
+          note,
+          input_type,
+          checkin_date
+        )
+        VALUES (
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7,
+          CURRENT_DATE
+        )
 
-    if (
-      normalizedStress !== null &&
-      (
-        !Number.isInteger(normalizedStress) ||
-        normalizedStress < 1 ||
-        normalizedStress > 10
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "stressScore must be an integer between 1 and 10",
-      });
-    }
+        ON CONFLICT (user_id, checkin_date)
+        DO UPDATE SET
+          mood_score = EXCLUDED.mood_score,
+          stress_score = EXCLUDED.stress_score,
+          sleep_score = EXCLUDED.sleep_score,
+          energy_score = EXCLUDED.energy_score,
+          note = EXCLUDED.note,
+          input_type = EXCLUDED.input_type,
+          created_at = CURRENT_TIMESTAMP
 
-    if (
-      normalizedSleep !== null &&
-      (
-        !Number.isInteger(normalizedSleep) ||
-        normalizedSleep < 1 ||
-        normalizedSleep > 10
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "sleepScore must be an integer between 1 and 10",
-      });
-    }
+        RETURNING
+          checkin_id,
+          user_id,
+          mood_score,
+          stress_score,
+          sleep_score,
+          energy_score,
+          note,
+          input_type,
+          checkin_date,
+          created_at
+      `,
+      [
+        userId,
+        normalizedMood,
+        normalizedStress,
+        normalizedSleep,
+        normalizedEnergy,
+        normalizedNote,
+        normalizedInputType,
+      ]
+    );
 
-    const query = `
-      INSERT INTO daily_checkins (
-        user_id,
-        mood_score,
-        stress_score,
-        sleep_score,
-        note
-      )
-      VALUES ($1, $2, $3, $4, $5)
-
-      ON CONFLICT (user_id, checkin_date)
-      DO UPDATE SET
-        mood_score = EXCLUDED.mood_score,
-        stress_score = EXCLUDED.stress_score,
-        sleep_score = EXCLUDED.sleep_score,
-        note = EXCLUDED.note,
-        created_at = CURRENT_TIMESTAMP
-
-      RETURNING
-        checkin_id,
-        user_id,
-        mood_score,
-        stress_score,
-        sleep_score,
-        note,
-        checkin_date,
-        created_at
-    `;
-
-    const values = [
-      userId,
-      normalizedMood,
-      normalizedStress,
-      normalizedSleep,
-      normalizedNote,
-    ];
-
-    const result = await pool.query(query, values);
-
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      message: "Daily check-in saved successfully",
+      message: "Check-in saved successfully",
       data: result.rows[0],
     });
   } catch (error) {
-    console.error("Check-in error:", error);
+    console.error("Create check-in error:", error);
 
     if (error.code === "23503") {
       return res.status(400).json({
@@ -159,34 +225,40 @@ router.post("/", async (req, res) => {
   }
 });
 
-
 /**
- * 取得指定匿名使用者的歷史 Check-in
+ * 取得某位使用者的 Check-in 歷史
  */
 router.get("/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const query = `
-      SELECT
-        checkin_id,
-        user_id,
-        mood_score,
-        stress_score,
-        sleep_score,
-        note,
-        checkin_date,
-        created_at
-      FROM daily_checkins
-      WHERE user_id = $1
-      ORDER BY checkin_date DESC, created_at DESC
-    `;
+    const result = await pool.query(
+      `
+        SELECT
+          checkin_id,
+          user_id,
+          mood_score,
+          stress_score,
+          sleep_score,
+          energy_score,
+          note,
+          input_type,
+          checkin_date,
+          created_at
 
-    const result = await pool.query(query, [userId]);
+        FROM daily_checkins
+
+        WHERE user_id = $1
+
+        ORDER BY
+          checkin_date DESC,
+          created_at DESC
+      `,
+      [userId]
+    );
 
     return res.status(200).json({
       success: true,
-      count: result.rows.length,
       data: result.rows,
     });
   } catch (error) {
@@ -194,11 +266,10 @@ router.get("/:userId", async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: "Unable to load check-in history",
+      message: "Unable to load check-ins",
     });
   }
 });
-
 
 /**
  * 修改指定 Check-in
@@ -212,7 +283,9 @@ router.put("/:checkinId", async (req, res) => {
       moodScore,
       stressScore,
       sleepScore,
+      energyScore,
       note,
+      inputType,
     } = req.body;
 
     if (!userId) {
@@ -222,99 +295,70 @@ router.put("/:checkinId", async (req, res) => {
       });
     }
 
-    const normalizedMood =
-      moodScore === undefined || moodScore === null
-        ? null
-        : moodScore;
+    const normalizedMood = normalizeNumber(moodScore);
+    const normalizedStress = normalizeNumber(stressScore);
+    const normalizedSleep = normalizeNumber(sleepScore);
+    const normalizedEnergy = normalizeNumber(energyScore);
 
-    const normalizedStress =
-      stressScore === undefined || stressScore === null
-        ? null
-        : stressScore;
+    const normalizedNote = normalizeText(note);
 
-    const normalizedSleep =
-      sleepScore === undefined || sleepScore === null
-        ? null
-        : sleepScore;
+    const normalizedInputType =
+      inputType === "voice" ? "voice" : "text";
 
-    const normalizedNote =
-      typeof note === "string" && note.trim().length > 0
-        ? note.trim()
-        : null;
+    const validationError = validateCheckin({
+      moodScore: normalizedMood,
+      stressScore: normalizedStress,
+      sleepScore: normalizedSleep,
+      energyScore: normalizedEnergy,
+      inputType: normalizedInputType,
+    });
 
-    const hasAnyCheckinData =
+    if (validationError) {
+      return res.status(400).json({
+        success: false,
+        message: validationError,
+      });
+    }
+
+    const hasContent =
       normalizedMood !== null ||
       normalizedStress !== null ||
       normalizedSleep !== null ||
+      normalizedEnergy !== null ||
       normalizedNote !== null;
 
-    if (!hasAnyCheckinData) {
+    if (!hasContent) {
       return res.status(400).json({
         success: false,
-        message: "Please provide at least one check-in item",
-      });
-    }
-
-    if (
-      normalizedMood !== null &&
-      (
-        !Number.isInteger(normalizedMood) ||
-        normalizedMood < 1 ||
-        normalizedMood > 6
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "moodScore must be an integer between 1 and 6",
-      });
-    }
-
-    if (
-      normalizedStress !== null &&
-      (
-        !Number.isInteger(normalizedStress) ||
-        normalizedStress < 1 ||
-        normalizedStress > 10
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "stressScore must be an integer between 1 and 10",
-      });
-    }
-
-    if (
-      normalizedSleep !== null &&
-      (
-        !Number.isInteger(normalizedSleep) ||
-        normalizedSleep < 1 ||
-        normalizedSleep > 10
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "sleepScore must be an integer between 1 and 10",
+        message: "Please complete at least one check-in item",
       });
     }
 
     const result = await pool.query(
       `
         UPDATE daily_checkins
+
         SET
           mood_score = $1,
           stress_score = $2,
           sleep_score = $3,
-          note = $4,
-          created_at = CURRENT_TIMESTAMP
-        WHERE checkin_id = $5
-          AND user_id = $6
+          energy_score = $4,
+          note = $5,
+          input_type = $6
+
+        WHERE
+          checkin_id = $7
+          AND user_id = $8
+
         RETURNING
           checkin_id,
           user_id,
           mood_score,
           stress_score,
           sleep_score,
+          energy_score,
           note,
+          input_type,
           checkin_date,
           created_at
       `,
@@ -322,7 +366,9 @@ router.put("/:checkinId", async (req, res) => {
         normalizedMood,
         normalizedStress,
         normalizedSleep,
+        normalizedEnergy,
         normalizedNote,
+        normalizedInputType,
         checkinId,
         userId,
       ]
@@ -350,7 +396,6 @@ router.put("/:checkinId", async (req, res) => {
   }
 });
 
-
 /**
  * 刪除指定 Check-in
  */
@@ -369,8 +414,11 @@ router.delete("/:checkinId", async (req, res) => {
     const result = await pool.query(
       `
         DELETE FROM daily_checkins
-        WHERE checkin_id = $1
+
+        WHERE
+          checkin_id = $1
           AND user_id = $2
+
         RETURNING checkin_id
       `,
       [checkinId, userId]
@@ -386,9 +434,6 @@ router.delete("/:checkinId", async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Check-in deleted successfully",
-      data: {
-        checkinId: result.rows[0].checkin_id,
-      },
     });
   } catch (error) {
     console.error("Delete check-in error:", error);
