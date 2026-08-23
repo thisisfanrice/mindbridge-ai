@@ -7,7 +7,8 @@ const checkinRouter = require("./routes/checkin");
 const userRoutes = require("./routes/users");
 const analysisRoutes = require("./routes/analysis");
 const profileRoutes = require("./routes/profile");
-
+const socraticRouter =
+  require("./routes/socratic");
 const app = express();
 
 const PORT = process.env.PORT || 3000;
@@ -27,6 +28,10 @@ app.use("/api/checkin", checkinRouter);
 app.use("/api/users", userRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/profile", profileRoutes);
+app.use(
+  "/api/socratic",
+  socraticRouter
+);
 
 app.use((err, req, res, next) => {
   console.error(err);

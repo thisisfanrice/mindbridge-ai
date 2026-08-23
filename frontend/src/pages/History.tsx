@@ -176,6 +176,44 @@ function History() {
 
     const [savingEdit, setSavingEdit] =
         useState(false);
+    const [socraticQuestion, setSocraticQuestion] =
+        useState("");
+
+    const [socraticAnswer, setSocraticAnswer] =
+        useState("");
+
+    const [socraticReflection, setSocraticReflection] =
+        useState("");
+
+    const [socraticAction, setSocraticAction] =
+        useState("");
+
+    const [socraticLoading, setSocraticLoading] =
+        useState(false);
+
+    const [socraticCompleted, setSocraticCompleted] =
+        useState(false);
+
+    const speakText = (text: string) => {
+        if (!text.trim()) {
+            return;
+        }
+
+        if (!("speechSynthesis" in window)) {
+            setMessage("這個瀏覽器目前不支援語音朗讀。");
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+
+        utterance.lang = "zh-TW";
+        utterance.rate = 0.95;
+        utterance.pitch = 1.0;
+
+        window.speechSynthesis.speak(utterance);
+    };
 
     const loadAnalysis = async (
         sourceRecords: CheckinRecord[]
@@ -299,6 +337,146 @@ function History() {
             );
         } finally {
             setAnalysisLoading(false);
+        }
+    };
+
+    const startSocraticReflection = async () => {
+        try {
+            const userId =
+                localStorage.getItem("mindbridge_user_id");
+
+            if (!userId) {
+                setMessage("找不到使用者資料。");
+                return;
+            }
+
+            const latestRecord = records[0];
+
+            if (!latestRecord?.note) {
+                setMessage(
+                    "最近一筆 Check-in 沒有文字內容，暫時無法開始反思問答。"
+                );
+                return;
+            }
+
+            setSocraticLoading(true);
+            setSocraticCompleted(false);
+            setSocraticReflection("");
+            setSocraticAction("");
+            setSocraticAnswer("");
+
+            const response = await fetch(
+                `${import.meta.env.VITE_API_URL}/api/socratic`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        phase: "initial",
+                        journalText: latestRecord.note,
+                        moodScore: latestRecord.mood_score,
+                        stressScore: latestRecord.stress_score,
+                        sleepScore: latestRecord.sleep_score,
+                        energyScore: latestRecord.energy_score,
+                        conversationTurn: 1,
+                    }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    "Unable to start Socratic reflection"
+                );
+            }
+
+            setSocraticQuestion(
+                data.socraticQuestion || ""
+            );
+        } catch (error) {
+            console.error(
+                "Socratic initial error:",
+                error
+            );
+
+            setMessage(
+                error instanceof Error
+                    ? `❌ ${error.message}`
+                    : "❌ 無法開始反思問答"
+            );
+        } finally {
+            setSocraticLoading(false);
+        }
+    };
+
+    const submitSocraticAnswer = async () => {
+        try {
+            const userId =
+                localStorage.getItem("mindbridge_user_id");
+
+            if (!userId) {
+                setMessage("找不到使用者資料。");
+                return;
+            }
+
+            if (!socraticAnswer.trim()) {
+                setMessage("先輸入你的想法再送出。");
+                return;
+            }
+
+            setSocraticLoading(true);
+
+            const response = await fetch(
+                `${import.meta.env.VITE_API_URL}/api/socratic`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        userId,
+                        phase: "reflection",
+                        userAnswer: socraticAnswer.trim(),
+                        conversationTurn: 2,
+                    }),
+                }
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message ||
+                    "Unable to continue Socratic reflection"
+                );
+            }
+
+            setSocraticReflection(
+                data.reflectionText || ""
+            );
+
+            setSocraticAction(
+                data.actionText || ""
+            );
+
+            setSocraticCompleted(true);
+        } catch (error) {
+            console.error(
+                "Socratic reflection error:",
+                error
+            );
+
+            setMessage(
+                error instanceof Error
+                    ? `❌ ${error.message}`
+                    : "❌ 無法完成反思問答"
+            );
+        } finally {
+            setSocraticLoading(false);
         }
     };
 
@@ -876,13 +1054,136 @@ function History() {
 
                             {/* AI Insight */}
                             <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-5">
-                                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500">
-                                    AI Insight
-                                </p>
+                                <div className="flex items-center justify-between gap-3">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-indigo-500">
+                                        AI Insight
+                                    </p>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => speakText(aiInsight)}
+                                        className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50"
+                                    >
+                                        🔊 朗讀
+                                    </button>
+                                </div>
 
                                 <p className="mt-2 leading-7 text-slate-700">
                                     {aiInsight}
                                 </p>
+                            </div>
+
+                            {/* Socratic Reflection */}
+                            <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-5">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-violet-500">
+                                            Socratic Reflection
+                                        </p>
+
+                                        <p className="mt-1 text-sm text-slate-500">
+                                            用一個問題，幫你把現在最卡住的地方整理清楚。
+                                        </p>
+                                    </div>
+
+                                    {!socraticQuestion &&
+                                        !socraticCompleted && (
+                                            <button
+                                                type="button"
+                                                onClick={startSocraticReflection}
+                                                disabled={socraticLoading}
+                                                className="rounded-full bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {socraticLoading
+                                                    ? "整理中..."
+                                                    : "開始反思"}
+                                            </button>
+                                        )}
+                                </div>
+
+                                {socraticQuestion && !socraticCompleted && (
+                                    <div className="mt-5">
+                                        <div className="rounded-2xl bg-white p-4 ring-1 ring-violet-100">
+                                            <p className="text-xs font-semibold text-violet-500">
+                                                想一想
+                                            </p>
+
+                                            <p className="mt-2 leading-7 text-slate-800">
+                                                {socraticQuestion}
+                                            </p>
+                                        </div>
+
+                                        <textarea
+                                            value={socraticAnswer}
+                                            onChange={(e) =>
+                                                setSocraticAnswer(e.target.value)
+                                            }
+                                            rows={3}
+                                            placeholder="寫下你現在想到的答案..."
+                                            className="mt-4 w-full resize-none rounded-2xl border border-slate-200 bg-white p-4 leading-7 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                                        />
+
+                                        <div className="mt-3 flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={submitSocraticAnswer}
+                                                disabled={
+                                                    socraticLoading ||
+                                                    !socraticAnswer.trim()
+                                                }
+                                                className="rounded-full bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                            >
+                                                {socraticLoading
+                                                    ? "思考中..."
+                                                    : "送出回答"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {socraticCompleted && (
+                                    <div className="mt-5 space-y-4">
+                                        {socraticReflection && (
+                                            <div className="rounded-2xl bg-white p-4 ring-1 ring-violet-100">
+                                                <p className="text-xs font-semibold text-violet-500">
+                                                    反思整理
+                                                </p>
+
+                                                <p className="mt-2 leading-7 text-slate-700">
+                                                    {socraticReflection}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {socraticAction && (
+                                            <div className="rounded-2xl bg-white p-4 ring-1 ring-violet-100">
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-violet-500">
+                                                            下一個小步驟
+                                                        </p>
+
+                                                        <p className="mt-2 leading-7 text-slate-700">
+                                                            {socraticAction}
+                                                        </p>
+                                                    </div>
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() =>
+                                                            speakText(
+                                                                `${socraticReflection} ${socraticAction}`
+                                                            )
+                                                        }
+                                                        className="shrink-0 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-600 transition hover:bg-violet-50"
+                                                    >
+                                                        🔊 朗讀
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             {/* 行動建議 */}

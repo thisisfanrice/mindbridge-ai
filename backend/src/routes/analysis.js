@@ -565,6 +565,9 @@ router.post("/", async (req, res) => {
     const safetyEscalation =
       showSupportResources;
 
+    const attributionText =
+      await buildAttributionText(userId);
+
     return res.status(200).json({
       success: true,
 

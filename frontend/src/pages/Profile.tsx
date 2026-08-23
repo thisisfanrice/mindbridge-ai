@@ -1,238 +1,497 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import { Link } from "react-router";
 
-const identityOptions = [
-  { value: "high_school", label: "高中生" },
-  { value: "college", label: "大學生" },
-  { value: "graduate", label: "研究生" },
-  { value: "working", label: "上班族" },
-  { value: "freelance", label: "自由工作者" },
-  { value: "other", label: "其他" },
+type Option = {
+  value: string;
+  label: string;
+};
+
+const identityOptions: Option[] = [
+  {
+    value: "working",
+    label: "上班族",
+  },
+  {
+    value: "freelance",
+    label: "自由工作",
+  },
+  {
+    value: "unemployed",
+    label: "待業中",
+  },
+  {
+    value: "homemaker",
+    label: "家庭主婦",
+  },
+  {
+    value: "senior",
+    label: "樂齡族",
+  },
+  {
+    value: "student",
+    label: "學生",
+  },
 ];
 
-const sleepScheduleOptions = [
-  { value: "early", label: "23 點前入睡" },
-  { value: "normal", label: "23 點～凌晨 1 點" },
-  { value: "night", label: "凌晨 1～3 點" },
-  { value: "irregular", label: "作息不固定" },
+const ageOptions: Option[] = [
+  {
+    value: "under_15",
+    label:
+      "15 歲以下（國中及以下）",
+  },
+  {
+    value: "15_18",
+    label:
+      "15 - 18 歲（高中職）",
+  },
+  {
+    value: "19_22",
+    label:
+      "19 - 22 歲（大專院校）",
+  },
+  {
+    value: "23_30",
+    label:
+      "23 - 30 歲（青年 / 初入職場）",
+  },
+  {
+    value: "over_30",
+    label:
+      "30 歲以上",
+  },
 ];
 
-const baselineSleepOptions = [
-  { value: "<5h", label: "少於 5 小時" },
-  { value: "5-7h", label: "5～7 小時" },
-  { value: "7-9h", label: "7～9 小時" },
-  { value: ">9h", label: "超過 9 小時" },
+const stressOptions: Option[] = [
+  {
+    value: "career",
+    label: "工作和職涯",
+  },
+  {
+    value: "finance",
+    label: "財務和經濟",
+  },
+  {
+    value: "future",
+    label: "未來迷茫",
+  },
+  {
+    value:
+      "relationships_family",
+    label: "人際和家庭",
+  },
+  {
+    value: "health",
+    label: "健康和體力",
+  },
+  {
+    value: "study",
+    label: "課業和學業",
+  },
 ];
 
-const stressSourceOptions = [
-  { value: "study", label: "課業" },
-  { value: "work", label: "工作" },
-  { value: "relation", label: "人際" },
-  { value: "family", label: "家庭" },
-  { value: "finance", label: "經濟" },
-  { value: "health", label: "健康" },
-  { value: "future", label: "未來規劃" },
-  { value: "other", label: "其他" },
+const sleepScheduleOptions: Option[] = [
+  {
+    value: "early",
+    label:
+      "早睡早起、規律作息",
+  },
+  {
+    value: "night",
+    label:
+      "夜型作息、習慣熬夜",
+  },
+  {
+    value: "irregular",
+    label: "作息不固定",
+  },
 ];
 
-const copingMethodOptions = [
-  { value: "music", label: "聽音樂" },
-  { value: "exercise", label: "運動" },
-  { value: "video", label: "看影片" },
-  { value: "chat", label: "聊天" },
-  { value: "alone", label: "自己待著" },
-  { value: "sleep", label: "睡覺" },
-  { value: "game", label: "玩遊戲" },
-  { value: "journal", label: "寫日記" },
+const baselineSleepOptions: Option[] = [
+  {
+    value: "under_5",
+    label: "小於 5 小時",
+  },
+  {
+    value: "5_7",
+    label: "5 - 7 小時",
+  },
+  {
+    value: "7_9",
+    label: "7 - 9 小時",
+  },
+  {
+    value: "over_9",
+    label: "9 小時以上",
+  },
 ];
 
-const companionStyleOptions = [
-  { value: "warm", label: "溫暖鼓勵" },
-  { value: "organize", label: "幫我整理想法" },
-  { value: "action", label: "給我具體建議" },
-  { value: "brief", label: "簡短陪伴" },
+const companionStyleOptions: Option[] = [
+  {
+    value: "warm",
+    label: "溫柔同理",
+  },
+  {
+    value: "rational",
+    label: "理性客觀",
+  },
+  {
+    value: "positive",
+    label: "積極客觀",
+  },
 ];
 
-const preferredElementOptions = [
-  { value: "emoji", label: "Emoji" },
-  { value: "animal", label: "動物元素" },
-  { value: "scenery", label: "風景" },
-  { value: "music", label: "音樂" },
-  { value: "animation", label: "動畫感" },
-  { value: "none", label: "不特別偏好" },
+const energyOptions: Option[] = [
+  {
+    value: "full",
+    label: "能量充沛",
+  },
+  {
+    value: "maintaining",
+    label: "尚可維持",
+  },
+  {
+    value: "drained",
+    label: "嚴重透支",
+  },
+];
+
+const socraticOptions: Option[] = [
+  {
+    value: "study",
+    label:
+      "開啟作業家教模式",
+  },
+  {
+    value: "emotional",
+    label:
+      "維持純情緒陪伴",
+  },
 ];
 
 function Profile() {
-  const [userIdentity, setUserIdentity] = useState("");
-  const [sleepSchedule, setSleepSchedule] = useState("");
-  const [baselineSleep, setBaselineSleep] = useState("");
-
-  const [stressSources, setStressSources] = useState<string[]>([]);
-  const [copingMethods, setCopingMethods] = useState<string[]>([]);
-  const [companionStyle, setCompanionStyle] = useState("");
-  const [preferredElements, setPreferredElements] = useState<string[]>([]);
-  const [userTarget, setUserTarget] = useState("");
+  const [
+    userIdentity,
+    setUserIdentity,
+  ] = useState("");
 
   const [
-    allowProfilePersonalization,
-    setAllowProfilePersonalization,
+    ageRange,
+    setAgeRange,
+  ] = useState("");
+
+  const [
+    stressSources,
+    setStressSources,
+  ] = useState<string[]>([]);
+
+  const [
+    sleepSchedule,
+    setSleepSchedule,
+  ] = useState("");
+
+  const [
+    baselineSleep,
+    setBaselineSleep,
+  ] = useState("");
+
+  const [
+    companionStyle,
+    setCompanionStyle,
+  ] = useState("");
+
+  const [
+    currentEnergyLevel,
+    setCurrentEnergyLevel,
+  ] = useState("");
+
+  const [
+    socraticMode,
+    setSocraticMode,
+  ] = useState("");
+
+  const [
+    termsAccepted,
+    setTermsAccepted,
   ] = useState(false);
 
   const [
-    allowHistoryAnalysis,
-    setAllowHistoryAnalysis,
+    allowDataAnalysis,
+    setAllowDataAnalysis,
+  ] = useState(false);
+
+  const [
+    loading,
+    setLoading,
   ] = useState(true);
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
+
+  const [
+    message,
+    setMessage,
+  ] = useState("");
+
+  /*
+   * =========================
+   * Load profile
+   * =========================
+   */
 
   useEffect(() => {
-    const loadProfile = async () => {
-      try {
-        const userId = localStorage.getItem("mindbridge_user_id");
+    const loadProfile =
+      async () => {
+        try {
+          const userId =
+            localStorage.getItem(
+              "mindbridge_user_id"
+            );
 
-        if (!userId) {
-          setMessage("找不到使用者資料，請先回首頁重新建立匿名使用者。");
-          return;
-        }
+          if (!userId) {
+            setMessage(
+              "找不到使用者資料，請先回首頁重新建立匿名使用者。"
+            );
 
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/profile/${userId}`
-        );
+            return;
+          }
 
-        const data = await response.json();
+          const response =
+            await fetch(
+              `${
+                import.meta.env
+                  .VITE_API_URL
+              }/api/profile/${userId}`
+            );
 
-        if (!response.ok) {
-          throw new Error(data.message || "Unable to load profile");
-        }
+          const data =
+            await response.json();
 
-        if (data.data) {
-          setUserIdentity(data.data.user_identity || "");
-          setSleepSchedule(data.data.sleep_schedule || "");
-          setBaselineSleep(data.data.baseline_sleep || "");
+          if (!response.ok) {
+            throw new Error(
+              data.message ||
+                "Unable to load profile"
+            );
+          }
+
+          if (!data.data) {
+            return;
+          }
+
+          const profile =
+            data.data;
+
+          setUserIdentity(
+            profile.user_identity ||
+              ""
+          );
+
+          setAgeRange(
+            profile.age_range ||
+              ""
+          );
 
           setStressSources(
-            Array.isArray(data.data.stress_sources)
-              ? data.data.stress_sources
+            Array.isArray(
+              profile.stress_sources
+            )
+              ? profile.stress_sources
               : []
           );
 
-          setCopingMethods(
-            Array.isArray(data.data.coping_methods)
-              ? data.data.coping_methods
-              : []
+          setSleepSchedule(
+            profile.sleep_schedule ||
+              ""
           );
 
-          setCompanionStyle(data.data.companion_style || "");
-
-          setPreferredElements(
-            Array.isArray(data.data.preferred_elements)
-              ? data.data.preferred_elements
-              : []
+          setBaselineSleep(
+            profile.baseline_sleep ||
+              ""
           );
 
-          setUserTarget(data.data.user_target || "");
-
-          setAllowProfilePersonalization(
-            data.data.allow_profile_personalization ?? false
+          setCompanionStyle(
+            profile.companion_style ||
+              ""
           );
 
-          setAllowHistoryAnalysis(
-            data.data.allow_history_analysis ?? true
+          setCurrentEnergyLevel(
+            profile.current_energy_level ||
+              ""
           );
+
+          setSocraticMode(
+            profile.socratic_mode ||
+              ""
+          );
+
+          setTermsAccepted(
+            profile.terms_accepted ??
+              false
+          );
+
+          /*
+           * 現在一個 UI checkbox
+           * 同時控制兩個既有 permission。
+           */
+          setAllowDataAnalysis(
+            Boolean(
+              profile.allow_profile_personalization &&
+                profile.allow_history_analysis
+            )
+          );
+        } catch (error) {
+          console.error(
+            "Profile load error:",
+            error
+          );
+
+          setMessage(
+            error instanceof Error
+              ? error.message
+              : "載入設定時發生錯誤"
+          );
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error("Profile load error:", error);
-
-        setMessage(
-          error instanceof Error
-            ? error.message
-            : "載入設定時發生錯誤。"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
 
     loadProfile();
   }, []);
 
-  const toggleArrayValue = (
-    value: string,
-    values: string[],
-    setter: React.Dispatch<React.SetStateAction<string[]>>
+  /*
+   * =========================
+   * Stress multi-select
+   * =========================
+   */
+
+  const toggleStressSource = (
+    value: string
   ) => {
-    if (values.includes(value)) {
-      setter(values.filter((item) => item !== value));
-    } else {
-      setter([...values, value]);
-    }
-  };
-
-  const handleSave = async () => {
-    try {
-      setMessage("");
-
-      const userId = localStorage.getItem("mindbridge_user_id");
-
-      if (!userId) {
-        setMessage("找不到使用者資料，請先回首頁重新建立匿名使用者。");
-        return;
-      }
-
-      setSaving(true);
-
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/profile/${userId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            userIdentity,
-            sleepSchedule,
-            baselineSleep,
-            stressSources,
-            copingMethods,
-            companionStyle,
-            preferredElements,
-            userTarget,
-
-            allowProfilePersonalization,
-            allowHistoryAnalysis,
-          }),
+    setStressSources(
+      (previous) => {
+        if (
+          previous.includes(value)
+        ) {
+          return previous.filter(
+            (item) =>
+              item !== value
+          );
         }
-      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Unable to save profile");
+        return [
+          ...previous,
+          value,
+        ];
       }
-
-      setMessage("✅ 個人化設定已儲存");
-    } catch (error) {
-      console.error("Profile save error:", error);
-
-      setMessage(
-        error instanceof Error
-          ? `❌ ${error.message}`
-          : "❌ 儲存設定時發生錯誤"
-      );
-    } finally {
-      setSaving(false);
-    }
+    );
   };
+
+  /*
+   * =========================
+   * Save
+   * =========================
+   */
+
+  const handleSave =
+    async () => {
+      try {
+        setMessage("");
+
+        if (!termsAccepted) {
+          setMessage(
+            "請先閱讀並同意使用者服務條款。"
+          );
+
+          return;
+        }
+
+        const userId =
+          localStorage.getItem(
+            "mindbridge_user_id"
+          );
+
+        if (!userId) {
+          setMessage(
+            "找不到使用者資料。"
+          );
+
+          return;
+        }
+
+        setSaving(true);
+
+        const response =
+          await fetch(
+            `${
+              import.meta.env
+                .VITE_API_URL
+            }/api/profile/${userId}`,
+            {
+              method: "PUT",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  userIdentity,
+                  ageRange,
+                  stressSources,
+                  sleepSchedule,
+                  baselineSleep,
+                  companionStyle,
+                  currentEnergyLevel,
+                  socraticMode,
+
+                  termsAccepted,
+                  allowDataAnalysis,
+                }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message ||
+              "Unable to save profile"
+          );
+        }
+
+        setMessage(
+          "✅ 個人化設定已儲存"
+        );
+      } catch (error) {
+        console.error(
+          "Profile save error:",
+          error
+        );
+
+        setMessage(
+          error instanceof Error
+            ? `❌ ${error.message}`
+            : "❌ 儲存設定失敗"
+        );
+      } finally {
+        setSaving(false);
+      }
+    };
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
-        <div className="mx-auto max-w-4xl">
-          <div className="rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
-            <p className="text-slate-500">正在載入設定...</p>
-          </div>
+      <main className="min-h-screen bg-slate-50 px-4 py-8">
+        <div className="mx-auto max-w-4xl rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
+          <p className="text-slate-500">
+            正在載入設定...
+          </p>
         </div>
       </main>
     );
@@ -241,358 +500,374 @@ function Profile() {
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-4xl">
-        <div className="mb-8">
-          <Link
-            to="/"
-            className="text-sm font-medium text-slate-500 transition hover:text-indigo-600"
-          >
-            ← 返回首頁
-          </Link>
+        <Link
+          to="/"
+          className="text-sm font-medium text-slate-500 transition hover:text-indigo-600"
+        >
+          ← 返回首頁
+        </Link>
 
-          <h1 className="mt-5 text-3xl font-bold text-slate-900 sm:text-4xl">
-            個人化設定
+        <header className="mb-8 mt-5">
+          <p className="text-sm font-semibold text-indigo-600">
+            Onboarding
+          </p>
+
+          <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
+            讓 MindBridge 更了解你的偏好
           </h1>
 
           <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-            這些背景資料只需要設定一次，之後可以隨時修改。
-            全部皆為選填，你可以決定想提供多少資訊。
+            這些資料用來調整互動方式與趨勢整理，
+            之後都可以回來修改。
           </p>
-        </div>
+        </header>
 
-        <div className="space-y-6">
-          {/* 日常身份 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              日常身份
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              選填
-            </p>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {identityOptions.map((option) => {
-                const selected = userIdentity === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      setUserIdentity(selected ? "" : option.value)
-                    }
-                    className={`rounded-2xl border px-4 py-4 text-left font-medium transition ${
-                      selected
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 作息 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              平常作息型態
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              主要依平常入睡時間選擇
-            </p>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {sleepScheduleOptions.map((option) => {
-                const selected = sleepSchedule === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      setSleepSchedule(selected ? "" : option.value)
-                    }
-                    className={`rounded-2xl border px-4 py-4 text-left font-medium transition ${
-                      selected
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 平均睡眠 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              平均睡眠時間
-            </h2>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {baselineSleepOptions.map((option) => {
-                const selected = baselineSleep === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      setBaselineSleep(selected ? "" : option.value)
-                    }
-                    className={`rounded-2xl border px-4 py-4 text-left font-medium transition ${
-                      selected
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 壓力來源 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              主要壓力來源
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              可複選
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              {stressSourceOptions.map((option) => {
-                const selected = stressSources.includes(option.value);
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      toggleArrayValue(
-                        option.value,
-                        stressSources,
-                        setStressSources
-                      )
-                    }
-                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                      selected
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {selected ? "✓ " : ""}
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 調適方式 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              平常習慣怎麼調適自己？
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              可複選
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              {copingMethodOptions.map((option) => {
-                const selected = copingMethods.includes(option.value);
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      toggleArrayValue(
-                        option.value,
-                        copingMethods,
-                        setCopingMethods
-                      )
-                    }
-                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                      selected
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {selected ? "✓ " : ""}
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* AI 陪伴風格 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              希望 AI 怎麼陪你？
-            </h2>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {companionStyleOptions.map((option) => {
-                const selected = companionStyle === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      setCompanionStyle(selected ? "" : option.value)
-                    }
-                    className={`rounded-2xl border px-4 py-4 text-left font-medium transition ${
-                      selected
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 偏好互動元素 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              偏好的互動元素
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              可複選
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              {preferredElementOptions.map((option) => {
-                const selected = preferredElements.includes(option.value);
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() =>
-                      toggleArrayValue(
-                        option.value,
-                        preferredElements,
-                        setPreferredElements
-                      )
-                    }
-                    className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-                      selected
-                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    {selected ? "✓ " : ""}
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 近期目標 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              最近正在努力的目標
-            </h2>
-
-            <p className="mt-1 text-sm text-slate-500">
-              選填
-            </p>
-
-            <textarea
-              value={userTarget}
-              onChange={(e) => setUserTarget(e.target.value)}
-              rows={3}
-              placeholder="例如：準備考試、完成專題、調整作息..."
-              className="mt-5 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 p-4 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50"
-            />
-          </section>
-
-          {/* AI 權限 */}
-          <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-8">
-            <h2 className="text-lg font-bold text-slate-900">
-              AI 個人化權限
-            </h2>
-
-            <div className="mt-6 space-y-4">
-              <label className="flex cursor-pointer items-start justify-between gap-5 rounded-2xl border border-slate-200 p-4">
-                <div>
-                  <p className="font-semibold text-slate-800">
-                    使用背景資料提供個人化內容
-                  </p>
-
-                  <p className="mt-1 text-sm leading-6 text-slate-500">
-                    允許 AI 使用你的作息、壓力來源、調適方式與偏好，
-                    提供更貼近你的內容。
-                  </p>
-                </div>
-
-                <input
-                  type="checkbox"
-                  checked={allowProfilePersonalization}
-                  onChange={(e) =>
-                    setAllowProfilePersonalization(e.target.checked)
-                  }
-                  className="mt-1 h-5 w-5 accent-indigo-600"
-                />
-              </label>
-
-              <label className="flex cursor-pointer items-start justify-between gap-5 rounded-2xl border border-slate-200 p-4">
-                <div>
-                  <p className="font-semibold text-slate-800">
-                    使用過去 Check-in 分析長期趨勢
-                  </p>
-
-                  <p className="mt-1 text-sm leading-6 text-slate-500">
-                    允許系統使用過去紀錄觀察近期及長期變化。
-                  </p>
-                </div>
-
-                <input
-                  type="checkbox"
-                  checked={allowHistoryAnalysis}
-                  onChange={(e) =>
-                    setAllowHistoryAnalysis(e.target.checked)
-                  }
-                  className="mt-1 h-5 w-5 accent-indigo-600"
-                />
-              </label>
-            </div>
-          </section>
-
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full rounded-2xl bg-indigo-600 px-6 py-4 font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Identity */}
+          <ProfileCard
+            title="您目前的身分是？"
           >
-            {saving ? "儲存中..." : "儲存個人化設定"}
-          </button>
+            <OptionGrid
+              options={
+                identityOptions
+              }
+              value={
+                userIdentity
+              }
+              onChange={
+                setUserIdentity
+              }
+            />
+          </ProfileCard>
 
-          {message && (
-            <div className="rounded-2xl bg-white px-4 py-3 text-center text-sm text-slate-700 shadow-sm ring-1 ring-slate-200">
-              {message}
+          {/* Age */}
+          <ProfileCard
+            title="您的年齡區間是？"
+          >
+            <OptionGrid
+              options={
+                ageOptions
+              }
+              value={ageRange}
+              onChange={
+                setAgeRange
+              }
+              singleColumn
+            />
+          </ProfileCard>
+
+          {/* Stress */}
+          <ProfileCard
+            title="主要壓力來源（多選）"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              {stressOptions.map(
+                (option) => {
+                  const selected =
+                    stressSources.includes(
+                      option.value
+                    );
+
+                  return (
+                    <button
+                      key={
+                        option.value
+                      }
+                      type="button"
+                      onClick={() =>
+                        toggleStressSource(
+                          option.value
+                        )
+                      }
+                      className={`rounded-full border px-3 py-2 text-sm font-medium transition ${
+                        selected
+                          ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                          : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200"
+                      }`}
+                    >
+                      {selected
+                        ? "✓ "
+                        : ""}
+                      {
+                        option.label
+                      }
+                    </button>
+                  );
+                }
+              )}
             </div>
-          )}
+          </ProfileCard>
+
+          {/* Sleep baseline */}
+          <ProfileCard
+            title="每日平均睡眠時數"
+          >
+            <OptionGrid
+              options={
+                baselineSleepOptions
+              }
+              value={
+                baselineSleep
+              }
+              onChange={
+                setBaselineSleep
+              }
+            />
+          </ProfileCard>
+
+          {/* Schedule */}
+          <ProfileCard
+            title="您的日常作息型態"
+          >
+            <OptionGrid
+              options={
+                sleepScheduleOptions
+              }
+              value={
+                sleepSchedule
+              }
+              onChange={
+                setSleepSchedule
+              }
+              singleColumn
+            />
+          </ProfileCard>
+
+          {/* Companion style */}
+          <ProfileCard
+            title="您希望 AI 提供什麼樣的陪伴與說話風格？"
+          >
+            <OptionGrid
+              options={
+                companionStyleOptions
+              }
+              value={
+                companionStyle
+              }
+              onChange={
+                setCompanionStyle
+              }
+              singleColumn
+            />
+          </ProfileCard>
+
+          {/* Energy */}
+          <ProfileCard
+            title="近期的整體心靈能量"
+          >
+            <OptionGrid
+              options={
+                energyOptions
+              }
+              value={
+                currentEnergyLevel
+              }
+              onChange={
+                setCurrentEnergyLevel
+              }
+              singleColumn
+            />
+          </ProfileCard>
+
+          {/* Socratic */}
+          <ProfileCard
+            title="需要開啟課業與學習輔導嗎？"
+          >
+            <p className="mb-4 text-xs leading-5 text-slate-400">
+              開啟後，AI
+              會使用較多引導式提問協助整理學習與課業問題。
+            </p>
+
+            <OptionGrid
+              options={
+                socraticOptions
+              }
+              value={
+                socraticMode
+              }
+              onChange={
+                setSocraticMode
+              }
+              singleColumn
+            />
+          </ProfileCard>
         </div>
+
+        {/* Terms */}
+        <section className="mt-6 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-7">
+          <h2 className="text-center text-lg font-bold text-slate-900">
+            使用條款與資料授權
+          </h2>
+
+          <div className="mt-5 space-y-4">
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={
+                  termsAccepted
+                }
+                onChange={(e) =>
+                  setTermsAccepted(
+                    e.target
+                      .checked
+                  )
+                }
+                className="mt-1 h-5 w-5 accent-indigo-600"
+              />
+
+              <span className="text-sm leading-6 text-slate-700">
+                我已閱讀並同意
+                《使用者服務條款》。
+              </span>
+            </label>
+
+            <label className="flex cursor-pointer items-start gap-3">
+              <input
+                type="checkbox"
+                checked={
+                  allowDataAnalysis
+                }
+                onChange={(e) =>
+                  setAllowDataAnalysis(
+                    e.target
+                      .checked
+                  )
+                }
+                className="mt-1 h-5 w-5 accent-indigo-600"
+              />
+
+              <span className="text-sm leading-6 text-slate-700">
+                允許系統使用我提供的背景資料與
+                Check-in
+                紀錄進行個人化與趨勢整理。
+                此設定之後可以修改。
+              </span>
+            </label>
+          </div>
+
+          <div className="mt-5 rounded-2xl bg-slate-50 p-4">
+            <p className="text-xs leading-6 text-slate-500">
+              MindBridge
+              提供日常紀錄、反思與一般支持，
+              不作為醫療診斷、心理治療或緊急救援服務。
+              語音功能預設只儲存轉換後的文字，
+              不長期保存原始音檔。
+            </p>
+          </div>
+        </section>
+
+        <button
+          type="button"
+          onClick={
+            handleSave
+          }
+          disabled={saving}
+          className="mt-6 w-full rounded-2xl bg-indigo-600 px-6 py-4 font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {saving
+            ? "儲存中..."
+            : "儲存並完成設定"}
+        </button>
+
+        {message && (
+          <div className="mt-4 rounded-2xl bg-white p-4 text-center text-sm text-slate-700 shadow-sm ring-1 ring-slate-200">
+            {message}
+          </div>
+        )}
       </div>
     </main>
+  );
+}
+
+/*
+ * =========================
+ * Card
+ * =========================
+ */
+
+interface ProfileCardProps {
+  title: string;
+  children:
+    React.ReactNode;
+}
+
+function ProfileCard({
+  title,
+  children,
+}: ProfileCardProps) {
+  return (
+    <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-6">
+      <h2 className="mb-4 text-center font-bold text-slate-800">
+        {title}
+      </h2>
+
+      {children}
+    </section>
+  );
+}
+
+/*
+ * =========================
+ * Single-select buttons
+ * =========================
+ */
+
+interface OptionGridProps {
+  options: Option[];
+  value: string;
+  onChange: (
+    value: string
+  ) => void;
+  singleColumn?: boolean;
+}
+
+function OptionGrid({
+  options,
+  value,
+  onChange,
+  singleColumn = false,
+}: OptionGridProps) {
+  return (
+    <div
+      className={
+        singleColumn
+          ? "grid gap-2"
+          : "grid grid-cols-2 gap-2 sm:grid-cols-3"
+      }
+    >
+      {options.map(
+        (option) => {
+          const selected =
+            value ===
+            option.value;
+
+          return (
+            <button
+              key={
+                option.value
+              }
+              type="button"
+              onClick={() =>
+                onChange(
+                  selected
+                    ? ""
+                    : option.value
+                )
+              }
+              className={`rounded-full border px-3 py-2 text-sm font-medium transition ${
+                selected
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
+                  : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200"
+              }`}
+            >
+              {
+                option.label
+              }
+            </button>
+          );
+        }
+      )}
+    </div>
   );
 }
 

@@ -3,9 +3,140 @@ const pool = require("../db");
 
 const router = express.Router();
 
-/**
- * 取得使用者 Profile / Onboarding 設定
+/*
+ * =========================
+ * Allowed values
+ * =========================
  */
+
+const USER_IDENTITIES = [
+  "working",
+  "freelance",
+  "unemployed",
+  "homemaker",
+  "senior",
+  "student",
+];
+
+const AGE_RANGES = [
+  "under_15",
+  "15_18",
+  "19_22",
+  "23_30",
+  "over_30",
+];
+
+const STRESS_SOURCES = [
+  "career",
+  "finance",
+  "future",
+  "relationships_family",
+  "health",
+  "study",
+];
+
+const STRESS_SOURCE_ALIASES = {
+  // 新版
+  career: "career",
+  finance: "finance",
+  future: "future",
+  relationships_family: "relationships_family",
+  health: "health",
+  study: "study",
+
+  // 舊版英文
+  work: "career",
+  relation: "relationships_family",
+  family: "relationships_family",
+  other: "future",
+
+  // 舊版中文
+  工作: "career",
+  職涯: "career",
+  經濟: "finance",
+  未來規劃: "future",
+  人際: "relationships_family",
+  家庭: "relationships_family",
+  健康: "health",
+  課業: "study",
+};
+
+const SLEEP_SCHEDULES = [
+  "early",
+  "night",
+  "irregular",
+];
+
+const BASELINE_SLEEP = [
+  "under_5",
+  "5_7",
+  "7_9",
+  "over_9",
+];
+
+const COMPANION_STYLES = [
+  "warm",
+  "rational",
+  "positive",
+];
+
+const ENERGY_LEVELS = [
+  "full",
+  "maintaining",
+  "drained",
+];
+
+const SOCRATIC_MODES = [
+  "study",
+  "emotional",
+];
+
+/*
+ * =========================
+ * Helpers
+ * =========================
+ */
+
+function normalizeString(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+
+  return trimmed.length > 0
+    ? trimmed
+    : null;
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(
+      (item) =>
+        typeof item === "string" &&
+        item.trim().length > 0
+    )
+    .map((item) => item.trim());
+}
+
+function validateChoice(value, allowedValues) {
+  if (value === null) {
+    return true;
+  }
+
+  return allowedValues.includes(value);
+}
+
+/*
+ * =========================
+ * GET Profile
+ * =========================
+ */
+
 router.get("/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
@@ -17,16 +148,21 @@ router.get("/:userId", async (req, res) => {
           user_id,
 
           life_status,
+
           user_identity,
+          age_range,
+          stress_sources,
           sleep_schedule,
           baseline_sleep,
-
-          stress_sources,
-          coping_methods,
           companion_style,
+          current_energy_level,
+          socratic_mode,
+
+          coping_methods,
           preferred_elements,
           user_target,
 
+          terms_accepted,
           allow_profile_personalization,
           allow_history_analysis,
 
@@ -34,6 +170,7 @@ router.get("/:userId", async (req, res) => {
           updated_at
 
         FROM user_profiles
+
         WHERE user_id = $1
       `,
       [userId]
@@ -51,38 +188,41 @@ router.get("/:userId", async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
-    console.error("Get profile error:", error);
+    console.error(
+      "Get profile error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,
-      message: "Unable to load profile",
+      message:
+        "Unable to load profile",
     });
   }
 });
 
-
-/**
- * 新增 / 更新 Profile / Onboarding
+/*
+ * =========================
+ * PUT Profile
+ * =========================
  */
+
 router.put("/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
 
     const {
-      lifeStatus,
-
       userIdentity,
+      ageRange,
+      stressSources,
       sleepSchedule,
       baselineSleep,
-
-      stressSources,
-      copingMethods,
       companionStyle,
-      preferredElements,
-      userTarget,
+      currentEnergyLevel,
+      socraticMode,
 
-      allowProfilePersonalization,
-      allowHistoryAnalysis,
+      termsAccepted,
+      allowDataAnalysis,
     } = req.body;
 
     if (!userId) {
@@ -92,129 +232,178 @@ router.put("/:userId", async (req, res) => {
       });
     }
 
-    /*
-     * 陣列型欄位驗證
-     */
-    if (
-      stressSources !== undefined &&
-      stressSources !== null &&
-      !Array.isArray(stressSources)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "stressSources must be an array",
-      });
-    }
-
-    if (
-      copingMethods !== undefined &&
-      copingMethods !== null &&
-      !Array.isArray(copingMethods)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "copingMethods must be an array",
-      });
-    }
-
-    if (
-      preferredElements !== undefined &&
-      preferredElements !== null &&
-      !Array.isArray(preferredElements)
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "preferredElements must be an array",
-      });
-    }
-
-    /*
-     * 單選 / 字串欄位正規化
-     */
-    const normalizedLifeStatus =
-      typeof lifeStatus === "string" &&
-      lifeStatus.trim().length > 0
-        ? lifeStatus.trim()
-        : null;
-
     const normalizedUserIdentity =
-      typeof userIdentity === "string" &&
-      userIdentity.trim().length > 0
-        ? userIdentity.trim()
-        : null;
+      normalizeString(userIdentity);
+
+    const normalizedAgeRange =
+      normalizeString(ageRange);
+
+    const normalizedStressSources =
+      normalizeStringArray(stressSources)
+        .map(
+          (item) =>
+            STRESS_SOURCE_ALIASES[item] || item
+        )
+        .filter(
+          (item, index, array) =>
+            array.indexOf(item) === index
+        );
 
     const normalizedSleepSchedule =
-      typeof sleepSchedule === "string" &&
-      sleepSchedule.trim().length > 0
-        ? sleepSchedule.trim()
-        : null;
+      normalizeString(
+        sleepSchedule
+      );
 
     const normalizedBaselineSleep =
-      typeof baselineSleep === "string" &&
-      baselineSleep.trim().length > 0
-        ? baselineSleep.trim()
-        : null;
+      normalizeString(
+        baselineSleep
+      );
 
     const normalizedCompanionStyle =
-      typeof companionStyle === "string" &&
-      companionStyle.trim().length > 0
-        ? companionStyle.trim()
-        : null;
+      normalizeString(
+        companionStyle
+      );
 
-    const normalizedUserTarget =
-      typeof userTarget === "string" &&
-      userTarget.trim().length > 0
-        ? userTarget.trim()
-        : null;
+    const normalizedEnergyLevel =
+      normalizeString(
+        currentEnergyLevel
+      );
 
-    /*
-     * 多選陣列欄位正規化
-     */
-    const normalizedStressSources =
-      Array.isArray(stressSources)
-        ? stressSources
-            .filter(
-              (item) =>
-                typeof item === "string" &&
-                item.trim().length > 0
-            )
-            .map((item) => item.trim())
-        : [];
-
-    const normalizedCopingMethods =
-      Array.isArray(copingMethods)
-        ? copingMethods
-            .filter(
-              (item) =>
-                typeof item === "string" &&
-                item.trim().length > 0
-            )
-            .map((item) => item.trim())
-        : [];
-
-    const normalizedPreferredElements =
-      Array.isArray(preferredElements)
-        ? preferredElements
-            .filter(
-              (item) =>
-                typeof item === "string" &&
-                item.trim().length > 0
-            )
-            .map((item) => item.trim())
-        : [];
+    const normalizedSocraticMode =
+      normalizeString(
+        socraticMode
+      );
 
     /*
-     * AI 權限
+     * =========================
+     * Validate choices
+     * =========================
      */
-    const profilePersonalization =
-      typeof allowProfilePersonalization === "boolean"
-        ? allowProfilePersonalization
-        : false;
 
-    const historyAnalysis =
-      typeof allowHistoryAnalysis === "boolean"
-        ? allowHistoryAnalysis
-        : true;
+    if (
+      !validateChoice(
+        normalizedUserIdentity,
+        USER_IDENTITIES
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid userIdentity",
+      });
+    }
+
+    if (
+      !validateChoice(
+        normalizedAgeRange,
+        AGE_RANGES
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid ageRange",
+      });
+    }
+
+    if (
+      !validateChoice(
+        normalizedSleepSchedule,
+        SLEEP_SCHEDULES
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid sleepSchedule",
+      });
+    }
+
+    if (
+      !validateChoice(
+        normalizedBaselineSleep,
+        BASELINE_SLEEP
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid baselineSleep",
+      });
+    }
+
+    if (
+      !validateChoice(
+        normalizedCompanionStyle,
+        COMPANION_STYLES
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid companionStyle",
+      });
+    }
+
+    if (
+      !validateChoice(
+        normalizedEnergyLevel,
+        ENERGY_LEVELS
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid currentEnergyLevel",
+      });
+    }
+
+    if (
+      !validateChoice(
+        normalizedSocraticMode,
+        SOCRATIC_MODES
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid socraticMode",
+      });
+    }
+
+    const invalidStressSource =
+      normalizedStressSources.find(
+        (item) =>
+          !STRESS_SOURCES.includes(
+            item
+          )
+      );
+
+    if (invalidStressSource) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid stress source",
+      });
+    }
+
+    /*
+     * 條款
+     */
+    const normalizedTermsAccepted =
+      termsAccepted === true;
+
+    /*
+     * UI 的「允許系統記錄與分析」
+     * 同時控制目前既有的：
+     *
+     * allow_profile_personalization
+     * allow_history_analysis
+     *
+     * 之後如果想拆成兩個選項也可以。
+     */
+    const normalizedDataPermission =
+      allowDataAnalysis === true;
 
     const result = await pool.query(
       `
@@ -222,19 +411,21 @@ router.put("/:userId", async (req, res) => {
           user_id,
 
           life_status,
+
           user_identity,
+          age_range,
+          stress_sources,
           sleep_schedule,
           baseline_sleep,
-
-          stress_sources,
-          coping_methods,
           companion_style,
-          preferred_elements,
-          user_target,
+          current_energy_level,
+          socratic_mode,
 
+          terms_accepted,
           allow_profile_personalization,
           allow_history_analysis
         )
+
         VALUES (
           $1,
           $2,
@@ -247,22 +438,42 @@ router.put("/:userId", async (req, res) => {
           $9,
           $10,
           $11,
-          $12
+          $12,
+          $13
         )
 
         ON CONFLICT (user_id)
+
         DO UPDATE SET
-          life_status = EXCLUDED.life_status,
+          life_status =
+            EXCLUDED.life_status,
 
-          user_identity = EXCLUDED.user_identity,
-          sleep_schedule = EXCLUDED.sleep_schedule,
-          baseline_sleep = EXCLUDED.baseline_sleep,
+          user_identity =
+            EXCLUDED.user_identity,
 
-          stress_sources = EXCLUDED.stress_sources,
-          coping_methods = EXCLUDED.coping_methods,
-          companion_style = EXCLUDED.companion_style,
-          preferred_elements = EXCLUDED.preferred_elements,
-          user_target = EXCLUDED.user_target,
+          age_range =
+            EXCLUDED.age_range,
+
+          stress_sources =
+            EXCLUDED.stress_sources,
+
+          sleep_schedule =
+            EXCLUDED.sleep_schedule,
+
+          baseline_sleep =
+            EXCLUDED.baseline_sleep,
+
+          companion_style =
+            EXCLUDED.companion_style,
+
+          current_energy_level =
+            EXCLUDED.current_energy_level,
+
+          socratic_mode =
+            EXCLUDED.socratic_mode,
+
+          terms_accepted =
+            EXCLUDED.terms_accepted,
 
           allow_profile_personalization =
             EXCLUDED.allow_profile_personalization,
@@ -270,23 +481,23 @@ router.put("/:userId", async (req, res) => {
           allow_history_analysis =
             EXCLUDED.allow_history_analysis,
 
-          updated_at = CURRENT_TIMESTAMP
+          updated_at =
+            CURRENT_TIMESTAMP
 
         RETURNING
           profile_id,
           user_id,
 
-          life_status,
           user_identity,
+          age_range,
+          stress_sources,
           sleep_schedule,
           baseline_sleep,
-
-          stress_sources,
-          coping_methods,
           companion_style,
-          preferred_elements,
-          user_target,
+          current_energy_level,
+          socratic_mode,
 
+          terms_accepted,
           allow_profile_personalization,
           allow_history_analysis,
 
@@ -296,40 +507,48 @@ router.put("/:userId", async (req, res) => {
       [
         userId,
 
-        normalizedLifeStatus,
+        // 舊欄位 life_status 暫時同步存同一個值
         normalizedUserIdentity,
+
+        normalizedUserIdentity,
+        normalizedAgeRange,
+        normalizedStressSources,
         normalizedSleepSchedule,
         normalizedBaselineSleep,
-
-        normalizedStressSources,
-        normalizedCopingMethods,
         normalizedCompanionStyle,
-        normalizedPreferredElements,
-        normalizedUserTarget,
+        normalizedEnergyLevel,
+        normalizedSocraticMode,
 
-        profilePersonalization,
-        historyAnalysis,
+        normalizedTermsAccepted,
+        normalizedDataPermission,
+        normalizedDataPermission,
       ]
     );
 
     return res.status(200).json({
       success: true,
-      message: "Profile saved successfully",
+      message:
+        "Profile saved successfully",
       data: result.rows[0],
     });
   } catch (error) {
-    console.error("Save profile error:", error);
+    console.error(
+      "Save profile error:",
+      error
+    );
 
     if (error.code === "23503") {
       return res.status(400).json({
         success: false,
-        message: "Invalid user ID",
+        message:
+          "Invalid user ID",
       });
     }
 
     return res.status(500).json({
       success: false,
-      message: "Unable to save profile",
+      message:
+        "Unable to save profile",
     });
   }
 });

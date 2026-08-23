@@ -60,7 +60,7 @@ function Home() {
             to="/profile"
             className="shrink-0 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600 hover:shadow-md"
           >
-            ⚙ 個人化設定
+            ⚙ 匿名個人化設定
           </Link>
         </header>
         {/* Main content */}
