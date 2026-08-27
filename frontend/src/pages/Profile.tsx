@@ -238,6 +238,9 @@ function Profile() {
     setMessage,
   ] = useState("");
 
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [dataModalOpen, setDataModalOpen] = useState(false);
+
   /*
    * =========================
    * Load profile
@@ -263,9 +266,8 @@ function Profile() {
 
           const response =
             await fetch(
-              `${
-                import.meta.env
-                  .VITE_API_URL
+              `${import.meta.env
+                .VITE_API_URL
               }/api/profile/${userId}`
             );
 
@@ -275,7 +277,7 @@ function Profile() {
           if (!response.ok) {
             throw new Error(
               data.message ||
-                "Unable to load profile"
+              "Unable to load profile"
             );
           }
 
@@ -288,12 +290,12 @@ function Profile() {
 
           setUserIdentity(
             profile.user_identity ||
-              ""
+            ""
           );
 
           setAgeRange(
             profile.age_range ||
-              ""
+            ""
           );
 
           setStressSources(
@@ -306,32 +308,32 @@ function Profile() {
 
           setSleepSchedule(
             profile.sleep_schedule ||
-              ""
+            ""
           );
 
           setBaselineSleep(
             profile.baseline_sleep ||
-              ""
+            ""
           );
 
           setCompanionStyle(
             profile.companion_style ||
-              ""
+            ""
           );
 
           setCurrentEnergyLevel(
             profile.current_energy_level ||
-              ""
+            ""
           );
 
           setSocraticMode(
             profile.socratic_mode ||
-              ""
+            ""
           );
 
           setTermsAccepted(
             profile.terms_accepted ??
-              false
+            false
           );
 
           /*
@@ -341,7 +343,7 @@ function Profile() {
           setAllowDataAnalysis(
             Boolean(
               profile.allow_profile_personalization &&
-                profile.allow_history_analysis
+              profile.allow_history_analysis
             )
           );
         } catch (error) {
@@ -402,9 +404,9 @@ function Profile() {
       try {
         setMessage("");
 
-        if (!termsAccepted) {
+        if (!termsAccepted || !allowDataAnalysis) {
           setMessage(
-            "請先閱讀並同意使用者服務條款。"
+            "請先閱讀並同意 MindBridge 使用服務條款與匿名資料隱私政策。"
           );
 
           return;
@@ -427,9 +429,8 @@ function Profile() {
 
         const response =
           await fetch(
-            `${
-              import.meta.env
-                .VITE_API_URL
+            `${import.meta.env
+              .VITE_API_URL
             }/api/profile/${userId}`,
             {
               method: "PUT",
@@ -462,7 +463,7 @@ function Profile() {
         if (!response.ok) {
           throw new Error(
             data.message ||
-              "Unable to save profile"
+            "Unable to save profile"
           );
         }
 
@@ -579,11 +580,10 @@ function Profile() {
                           option.value
                         )
                       }
-                      className={`rounded-full border px-3 py-2 text-sm font-medium transition ${
-                        selected
-                          ? "border-indigo-500 bg-indigo-50 text-indigo-700"
-                          : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200"
-                      }`}
+                      className={`rounded-full border px-3 py-2 text-sm font-medium transition ${selected
+                        ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200"
+                        }`}
                     >
                       {selected
                         ? "✓ "
@@ -694,67 +694,305 @@ function Profile() {
         </div>
 
         {/* Terms */}
-        <section className="mt-6 rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200 sm:p-7">
-          <h2 className="text-center text-lg font-bold text-slate-900">
-            使用條款與資料授權
-          </h2>
-
-          <div className="mt-5 space-y-4">
-            <label className="flex cursor-pointer items-start gap-3">
+        <ProfileCard title="使用條款與匿名資料隱私政策確認">
+          <div className="space-y-5">
+            {/* MindBridge 使用服務條款 */}
+            <label className="flex items-start gap-3">
               <input
                 type="checkbox"
-                checked={
-                  termsAccepted
-                }
-                onChange={(e) =>
-                  setTermsAccepted(
-                    e.target
-                      .checked
-                  )
-                }
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
                 className="mt-1 h-5 w-5 accent-indigo-600"
               />
 
-              <span className="text-sm leading-6 text-slate-700">
-                我已閱讀並同意
-                《使用者服務條款》。
+              <span className="text-base leading-7 text-slate-700">
+                我已閱讀並同意{" "}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setTermsModalOpen(true);
+                  }}
+                  className="font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                  《MindBridge 使用服務條款》
+                </button>
               </span>
             </label>
 
-            <label className="flex cursor-pointer items-start gap-3">
+            {/* MindBridge 匿名資料與隱私政策 */}
+            <label className="flex items-start gap-3">
               <input
                 type="checkbox"
-                checked={
-                  allowDataAnalysis
-                }
-                onChange={(e) =>
-                  setAllowDataAnalysis(
-                    e.target
-                      .checked
-                  )
-                }
+                checked={allowDataAnalysis}
+                onChange={(e) => setAllowDataAnalysis(e.target.checked)}
                 className="mt-1 h-5 w-5 accent-indigo-600"
               />
 
-              <span className="text-sm leading-6 text-slate-700">
-                允許系統使用我提供的背景資料與
-                Check-in
-                紀錄進行個人化與趨勢整理。
-                此設定之後可以修改。
+              <span className="text-base leading-7 text-slate-700">
+                我已閱讀並同意{" "}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setDataModalOpen(true);
+                  }}
+                  className="font-medium text-indigo-600 hover:text-indigo-800"
+                >
+                  《MindBridge 匿名資料與隱私政策》
+                </button>
               </span>
             </label>
           </div>
 
-          <div className="mt-5 rounded-2xl bg-slate-50 p-4">
-            <p className="text-xs leading-6 text-slate-500">
-              MindBridge
-              提供日常紀錄、反思與一般支持，
-              不作為醫療診斷、心理治療或緊急救援服務。
-              語音功能預設只儲存轉換後的文字，
-              不長期保存原始音檔。
+          <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-500">
+            <p>
+              兩項皆需勾選同意後，才能完成設定並開始使用 MindBridge。
+            </p>
+            <p>
+              MindBridge 提供日常紀錄、自我覺察、AI 陪伴與趨勢整理，不作為醫療診斷或正式心理治療。
             </p>
           </div>
-        </section>
+        </ProfileCard>
+
+        {/* MindBridge 使用服務條款 Modal */}
+        {termsModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+            onClick={() => setTermsModalOpen(false)}
+          >
+            <div
+              className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    MindBridge 使用服務條款
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    請閱讀以下內容後，再決定是否同意。
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setTermsModalOpen(false)}
+                  className="rounded-full px-3 py-1 text-2xl leading-none text-slate-500 hover:bg-slate-100"
+                  aria-label="關閉使用服務條款"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6 text-sm leading-7 text-slate-600">
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    4.1 服務定位
+                  </h3>
+                  <p>
+                    MindBridge 為 AI 輔助之日常情緒紀錄、自我覺察、心理陪伴與趨勢分析工具。
+                  </p>
+                  <p className="mt-2">
+                    系統透過使用者主動提供的資料與內容，協助整理情緒、想法與生活壓力。
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    4.2 非醫療與非診斷服務
+                  </h3>
+                  <p>
+                    MindBridge 不提供醫療診斷、精神疾病判定、正式心理治療或處方建議。
+                  </p>
+                  <p className="mt-2">
+                    AI 所提供的內容不得視為醫師、心理師或其他專業人員服務的替代。
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    4.3 AI 回應限制
+                  </h3>
+                  <p>
+                    AI 回應係根據使用者提供的資料與內容生成，可能存在理解誤差。
+                  </p>
+                  <p className="mt-2">
+                    使用者不應僅依據 AI 回應做出重大醫療、心理、財務或其他重要決策。
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    4.4 需要額外支持的情況
+                  </h3>
+                  <p>
+                    若系統判斷使用者可能需要更優先的安全支持，AI 將停止一般情緒分析、
+                    一般建議與蘇格拉底式對話，改以安全與尋求可信任支持為優先。
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    4.5 服務調整
+                  </h3>
+                  <p>
+                    MindBridge 得基於系統安全、服務優化與功能改善需求，
+                    調整 AI 回應邏輯、功能或相關規則。
+                  </p>
+                </section>
+              </div>
+
+              <div className="mt-8 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setTermsModalOpen(false)}
+                  className="rounded-xl bg-indigo-600 px-5 py-2.5 font-medium text-white hover:bg-indigo-700"
+                >
+                  閱讀完成
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* MindBridge 匿名資料與隱私政策 Modal */}
+        {dataModalOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+            onClick={() => setDataModalOpen(false)}
+          >
+            <div
+              className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl sm:p-8"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mb-6 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">
+                    MindBridge 匿名資料與隱私政策
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    說明 MindBridge 會處理哪些資料，以及資料的使用方式。
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setDataModalOpen(false)}
+                  className="rounded-full px-3 py-1 text-2xl leading-none text-slate-500 hover:bg-slate-100"
+                  aria-label="關閉匿名資料與隱私政策"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6 text-sm leading-7 text-slate-600">
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    5.1 匿名化原則
+                  </h3>
+                  <p>
+                    MindBridge 以降低直接識別個人身分資料蒐集為原則。
+                  </p>
+                  <p className="mt-2">
+                    使用者不需提供真實姓名等非必要個人資訊。
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    5.2 蒐集資料範圍
+                  </h3>
+
+                  <p className="mb-2">
+                    系統可能處理使用者主動提供的資料，包括：
+                  </p>
+
+                  <ul className="list-disc space-y-1 pl-6">
+                    <li>年齡區間</li>
+                    <li>壓力來源</li>
+                    <li>日常作息</li>
+                    <li>平均睡眠狀況</li>
+                    <li>AI 陪伴偏好</li>
+                    <li>每日心情</li>
+                    <li>每日壓力</li>
+                    <li>睡眠品質</li>
+                    <li>能量狀態</li>
+                    <li>文字紀錄</li>
+                    <li>語音轉文字內容</li>
+                  </ul>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    5.3 資料使用目的
+                  </h3>
+
+                  <p className="mb-2">
+                    資料主要用於：
+                  </p>
+
+                  <ol className="list-decimal space-y-1 pl-6">
+                    <li>提供個人化 AI 陪伴。</li>
+                    <li>產生每日狀態整理。</li>
+                    <li>提供近期趨勢分析與智慧洞察。</li>
+                    <li>改善系統功能與使用體驗。</li>
+                    <li>維護平台安全與適當的支持回應。</li>
+                  </ol>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    5.4 語音資料處理
+                  </h3>
+                  <p>
+                    使用者選擇語音輸入時，系統將語音內容轉換為文字，
+                    並以轉換後內容進行語意理解與 AI 回應。
+                  </p>
+                  <p className="mt-2">
+                    系統應依服務實際技術架構處理語音與文字資料，
+                    並避免將資料使用於與服務無關的用途。
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    5.5 資料最小化原則
+                  </h3>
+                  <p>
+                    系統僅處理提供服務所必要的資料。
+                  </p>
+                  <p className="mt-2">
+                    若選填欄位未填寫，AI 不得自行推測、補充或虛構使用者資訊。
+                  </p>
+                </section>
+
+                <section>
+                  <h3 className="mb-2 text-base font-semibold text-slate-800">
+                    5.6 趨勢分析資料
+                  </h3>
+                  <p>
+                    趨勢分析應以使用者實際累積的 Check-in 資料為基礎。
+                  </p>
+                  <p className="mt-2">
+                    若資料經去識別化或彙整後用於服務分析與改善，
+                    應避免直接辨識特定個人。
+                  </p>
+                </section>
+              </div>
+
+              <div className="mt-8 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setDataModalOpen(false)}
+                  className="rounded-xl bg-indigo-600 px-5 py-2.5 font-medium text-white hover:bg-indigo-700"
+                >
+                  閱讀完成
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <button
           type="button"
@@ -788,7 +1026,7 @@ function Profile() {
 interface ProfileCardProps {
   title: string;
   children:
-    React.ReactNode;
+  React.ReactNode;
 }
 
 function ProfileCard({
@@ -854,11 +1092,10 @@ function OptionGrid({
                     : option.value
                 )
               }
-              className={`rounded-full border px-3 py-2 text-sm font-medium transition ${
-                selected
-                  ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200"
-              }`}
+              className={`rounded-full border px-3 py-2 text-sm font-medium transition ${selected
+                ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
+                : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200"
+                }`}
             >
               {
                 option.label
