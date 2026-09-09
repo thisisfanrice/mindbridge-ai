@@ -1,5 +1,6 @@
 const express = require("express");
 const pool = require("../db");
+const { callStage1 } = require("../services/aiClient");
 
 const router = express.Router();
 
@@ -203,10 +204,112 @@ router.post("/", async (req, res) => {
       ]
     );
 
+    const checkin = result.rows[0];
+
+    // 建立 conversation
+    const conversationResult = await pool.query(
+      `
+  INSERT INTO conversations (
+    user_id,
+    checkin_id,
+    conversation_end,
+    safety_escalation
+  )
+  VALUES ($1, $2, false, false)
+  RETURNING conversation_id
+  `,
+      [checkin.user_id, checkin.checkin_id]
+    );
+
+    const conversationId =
+      conversationResult.rows[0].conversation_id;
+
+    // 存第一輪 user message
+    const initialUserContent =
+      normalizedNote ||
+      `Mood: ${normalizedMood ?? "N/A"}, Stress: ${normalizedStress ?? "N/A"
+      }, Sleep: ${normalizedSleep ?? "N/A"}, Energy: ${normalizedEnergy ?? "N/A"
+      }`;
+
+    await pool.query(
+      `
+  INSERT INTO conversation_messages (
+    conversation_id,
+    role,
+    content,
+    input_type
+  )
+  VALUES ($1, 'user', $2, $3)
+  `,
+      [
+        conversationId,
+        initialUserContent,
+        normalizedInputType,
+      ]
+    );
+
+    const stage1Response = {
+      safety_escalation: false,
+      summary_state: "已收到今天的 Check-in。",
+      message:
+        "我有收到你今天的紀錄，我們可以先從你最在意的部分開始整理。",
+      question:
+        "現在最讓你掛心的，是哪一件事情？",
+      conversation_end: false,
+      xai_reason:
+        "根據今天的 Check-in 數值與你提供的文字內容進行初步整理。",
+    };
+
+    // 存 assistant 第一輪
+    await pool.query(
+      `
+  INSERT INTO conversation_messages (
+    conversation_id,
+    role,
+    content,
+    input_type
+  )
+  VALUES ($1, 'assistant', $2, NULL)
+  `,
+      [
+        conversationId,
+        [
+          stage1Response.message,
+          stage1Response.question,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      ]
+    );
+
+    // 最後才回 response
     return res.status(200).json({
       success: true,
       message: "Check-in saved successfully",
-      data: result.rows[0],
+      data: checkin,
+
+      safety_escalation:
+        stage1Response.safety_escalation,
+
+      summary_state:
+        stage1Response.summary_state,
+
+      ai_message:
+        stage1Response.message,
+
+      question:
+        stage1Response.question,
+
+      demo_mode: stage1Response.demo_mode === true,
+
+      conversation_end:
+        stage1Response.conversation_end,
+
+      xai_reason:
+        stage1Response.xai_reason,
+
+      conversation_id:
+        conversationId,
     });
   } catch (error) {
     console.error("Create check-in error:", error);

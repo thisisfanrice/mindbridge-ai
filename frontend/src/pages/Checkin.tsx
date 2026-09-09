@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router-dom";
+import LumiStatusBar from "../components/LumiStatusBar";
 
 type InputType = "text" | "voice";
 
@@ -27,12 +28,12 @@ interface SpeechRecognitionLike {
   stop: () => void;
 
   onresult:
-    | ((event: SpeechRecognitionEventLike) => void)
-    | null;
+  | ((event: SpeechRecognitionEventLike) => void)
+  | null;
 
   onerror:
-    | ((event: SpeechRecognitionErrorEventLike) => void)
-    | null;
+  | ((event: SpeechRecognitionErrorEventLike) => void)
+  | null;
 
   onend: (() => void) | null;
 }
@@ -155,6 +156,9 @@ function Checkin() {
   const [message, setMessage] = useState("");
 
   const [saving, setSaving] = useState(false);
+  const [checkinSaved, setCheckinSaved] = useState(false);
+
+  const [lumiMessage, setLumiMessage] = useState("");
 
   const recognitionRef =
     useRef<SpeechRecognitionLike | null>(null);
@@ -346,8 +350,7 @@ function Checkin() {
       setSaving(true);
 
       const response = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/checkin`,
         {
           method: "POST",
@@ -379,17 +382,35 @@ function Checkin() {
       if (!response.ok) {
         throw new Error(
           data.message ||
-            "Unable to save check-in"
+          "Unable to save check-in"
         );
       }
 
-      setMessage(
-        "✅ 今日 Check-in 已儲存"
+      if (data.conversation_id) {
+        localStorage.setItem(
+          "mindbridge_active_conversation",
+          JSON.stringify({
+            conversationId: data.conversation_id,
+            safetyEscalation: data.safety_escalation ?? false,
+            summaryState: data.summary_state ?? "",
+            message: data.ai_message ?? data.message ?? "",
+            question: data.question ?? "",
+            conversationEnd: data.conversation_end ?? false,
+            xaiReason: data.xai_reason ?? "",
+            demoMode: data.demo_mode === true,
+          })
+        );
+      }
+
+      // 顯示這次成功儲存後取得的 Stage 1 回覆，不自行推測情緒。
+      setLumiMessage(
+        typeof data.ai_message === "string"
+          ? data.ai_message
+          : ""
       );
 
-      setTimeout(() => {
-        navigate("/history");
-      }, 700);
+      setMessage("✅ 今日 Check-in 已儲存");
+      setCheckinSaved(true);
     } catch (error) {
       console.error(
         "Check-in save error:",
@@ -429,6 +450,17 @@ function Checkin() {
             不需要每一項都填。記下你現在想記錄的部分就好。
           </p>
         </header>
+
+        <LumiStatusBar
+          posture="listening"
+          title="Lumi 陪伴中"
+          message={
+            lumiMessage ||
+            "可以用自己的步調，記錄今天的心情與想法。"
+          }
+          loading={saving}
+          className="mb-6"
+        />
 
         <div className="space-y-6">
           {/* Mood */}
@@ -473,22 +505,20 @@ function Checkin() {
                           option.value
                         )
                       }
-                      className={`rounded-2xl border px-2 py-4 text-center transition ${
-                        selected
-                          ? "border-indigo-500 bg-indigo-50 shadow-sm ring-2 ring-indigo-100"
-                          : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50"
-                      }`}
+                      className={`rounded-2xl border px-2 py-4 text-center transition ${selected
+                        ? "border-indigo-500 bg-indigo-50 shadow-sm ring-2 ring-indigo-100"
+                        : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50"
+                        }`}
                     >
                       <div className="text-3xl">
                         {option.emoji}
                       </div>
 
                       <div
-                        className={`mt-2 text-sm font-semibold ${
-                          selected
-                            ? "text-indigo-700"
-                            : "text-slate-700"
-                        }`}
+                        className={`mt-2 text-sm font-semibold ${selected
+                          ? "text-indigo-700"
+                          : "text-slate-700"
+                          }`}
                       >
                         {option.label}
                       </div>
@@ -518,16 +548,16 @@ function Checkin() {
 
               {stressScore !==
                 null && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setStressScore(null)
-                  }
-                  className="text-sm text-slate-400 hover:text-slate-700"
-                >
-                  清除
-                </button>
-              )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setStressScore(null)
+                    }
+                    className="text-sm text-slate-400 hover:text-slate-700"
+                  >
+                    清除
+                  </button>
+                )}
             </div>
 
             <div className="mt-6">
@@ -544,8 +574,8 @@ function Checkin() {
                   <div className="mt-1 text-sm font-medium text-slate-600">
                     {stressScore !== null
                       ? stressLabels[
-                          stressScore
-                        ]
+                      stressScore
+                      ]
                       : "尚未選擇"}
                   </div>
                 </div>
@@ -589,16 +619,16 @@ function Checkin() {
 
               {sleepScore !==
                 null && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSleepScore(null)
-                  }
-                  className="text-sm text-slate-400 hover:text-slate-700"
-                >
-                  清除
-                </button>
-              )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSleepScore(null)
+                    }
+                    className="text-sm text-slate-400 hover:text-slate-700"
+                  >
+                    清除
+                  </button>
+                )}
             </div>
 
             <div className="mt-6">
@@ -615,8 +645,8 @@ function Checkin() {
                   <div className="mt-1 text-sm font-medium text-slate-600">
                     {sleepScore !== null
                       ? sleepLabels[
-                          sleepScore
-                        ]
+                      sleepScore
+                      ]
                       : "尚未選擇"}
                   </div>
                 </div>
@@ -660,16 +690,16 @@ function Checkin() {
 
               {energyScore !==
                 null && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setEnergyScore(null)
-                  }
-                  className="text-sm text-slate-400 hover:text-slate-700"
-                >
-                  清除
-                </button>
-              )}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEnergyScore(null)
+                    }
+                    className="text-sm text-slate-400 hover:text-slate-700"
+                  >
+                    清除
+                  </button>
+                )}
             </div>
 
             <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -688,22 +718,20 @@ function Checkin() {
                           option.value
                         )
                       }
-                      className={`rounded-2xl border px-3 py-4 text-center transition ${
-                        selected
-                          ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
-                          : "border-slate-200 hover:border-indigo-200 hover:bg-slate-50"
-                      }`}
+                      className={`rounded-2xl border px-3 py-4 text-center transition ${selected
+                        ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
+                        : "border-slate-200 hover:border-indigo-200 hover:bg-slate-50"
+                        }`}
                     >
                       <div className="text-2xl">
                         {option.emoji}
                       </div>
 
                       <div
-                        className={`mt-2 text-sm font-semibold ${
-                          selected
-                            ? "text-indigo-700"
-                            : "text-slate-700"
-                        }`}
+                        className={`mt-2 text-sm font-semibold ${selected
+                          ? "text-indigo-700"
+                          : "text-slate-700"
+                          }`}
                       >
                         {option.label}
                       </div>
@@ -736,11 +764,10 @@ function Checkin() {
                     "text"
                   )
                 }
-                className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  inputType === "text"
-                    ? "bg-white text-indigo-700 shadow-sm"
-                    : "text-slate-500"
-                }`}
+                className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${inputType === "text"
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-slate-500"
+                  }`}
               >
                 ✏️ 文字輸入
               </button>
@@ -752,11 +779,10 @@ function Checkin() {
                     "voice"
                   )
                 }
-                className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-                  inputType === "voice"
-                    ? "bg-white text-indigo-700 shadow-sm"
-                    : "text-slate-500"
-                }`}
+                className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${inputType === "voice"
+                  ? "bg-white text-indigo-700 shadow-sm"
+                  : "text-slate-500"
+                  }`}
               >
                 🎙️ 語音輸入
               </button>
@@ -764,132 +790,150 @@ function Checkin() {
 
             {inputType ===
               "text" && (
-              <textarea
-                value={note}
-                onChange={(e) =>
-                  setNote(
-                    e.target.value
-                  )
-                }
-                rows={5}
-                placeholder="今天發生了什麼？有什麼想法或感受想留下來？"
-                className="mt-5 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 p-4 leading-7 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50"
-              />
-            )}
+                <textarea
+                  value={note}
+                  onChange={(e) =>
+                    setNote(
+                      e.target.value
+                    )
+                  }
+                  rows={5}
+                  placeholder="今天發生了什麼？有什麼想法或感受想留下來？"
+                  className="mt-5 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 p-4 leading-7 text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-50"
+                />
+              )}
 
             {inputType ===
               "voice" && (
-              <div className="mt-5">
-                <div
-                  className={`rounded-3xl border p-6 text-center transition ${
-                    isListening
+                <div className="mt-5">
+                  <div
+                    className={`rounded-3xl border p-6 text-center transition ${isListening
                       ? "border-indigo-300 bg-indigo-50"
                       : "border-slate-200 bg-slate-50"
-                  }`}
-                >
-                  {isListening ? (
-                    <>
-                      <div className="flex h-16 items-center justify-center gap-1">
-                        {[
-                          1, 2, 3, 4, 5,
-                          6, 7,
-                        ].map(
-                          (bar) => (
-                            <div
-                              key={
-                                bar
-                              }
-                              className="h-8 w-1.5 animate-pulse rounded-full bg-indigo-500"
-                              style={{
-                                animationDelay: `${bar * 90}ms`,
-                              }}
-                            />
+                      }`}
+                  >
+                    {isListening ? (
+                      <>
+                        <div className="flex h-16 items-center justify-center gap-1">
+                          {[
+                            1, 2, 3, 4, 5,
+                            6, 7,
+                          ].map(
+                            (bar) => (
+                              <div
+                                key={
+                                  bar
+                                }
+                                className="h-8 w-1.5 animate-pulse rounded-full bg-indigo-500"
+                                style={{
+                                  animationDelay: `${bar * 90}ms`,
+                                }}
+                              />
+                            )
+                          )}
+                        </div>
+
+                        <p className="mt-3 font-semibold text-indigo-700">
+                          正在聆聽...
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={
+                            stopVoiceInput
+                          }
+                          className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white"
+                        >
+                          ■ 停止錄音
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="text-4xl">
+                          🎙️
+                        </div>
+
+                        <p className="mt-3 font-semibold text-slate-700">
+                          用說的也可以
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          語音會轉成文字，
+                          不需要上傳錄音檔。
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={
+                            startVoiceInput
+                          }
+                          disabled={
+                            !voiceSupported
+                          }
+                          className="mt-4 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          🎙️ 開始說話
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {note && (
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        語音轉文字
+                      </p>
+
+                      <textarea
+                        value={note}
+                        onChange={(e) =>
+                          setNote(
+                            e.target
+                              .value
                           )
-                        )}
-                      </div>
-
-                      <p className="mt-3 font-semibold text-indigo-700">
-                        正在聆聽...
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={
-                          stopVoiceInput
                         }
-                        className="mt-4 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white"
-                      >
-                        ■ 停止錄音
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-4xl">
-                        🎙️
-                      </div>
-
-                      <p className="mt-3 font-semibold text-slate-700">
-                        用說的也可以
-                      </p>
-
-                      <p className="mt-1 text-sm text-slate-500">
-                        語音會轉成文字，
-                        不需要上傳錄音檔。
-                      </p>
-
-                      <button
-                        type="button"
-                        onClick={
-                          startVoiceInput
-                        }
-                        disabled={
-                          !voiceSupported
-                        }
-                        className="mt-4 rounded-full bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        🎙️ 開始說話
-                      </button>
-                    </>
+                        rows={4}
+                        className="w-full resize-none bg-transparent leading-7 text-slate-700 outline-none"
+                      />
+                    </div>
                   )}
                 </div>
-
-                {note && (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      語音轉文字
-                    </p>
-
-                    <textarea
-                      value={note}
-                      onChange={(e) =>
-                        setNote(
-                          e.target
-                            .value
-                        )
-                      }
-                      rows={4}
-                      className="w-full resize-none bg-transparent leading-7 text-slate-700 outline-none"
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+              )}
           </section>
 
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={saving}
+            disabled={saving || checkinSaved}
             className="w-full rounded-2xl bg-indigo-600 px-6 py-4 font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {saving
               ? "儲存中..."
-              : "完成今日 Check-in"}
+              : checkinSaved
+                ? "今日紀錄已完成"
+                : "完成今日 Check-in"}
           </button>
 
           {message && (
             <div className="rounded-2xl bg-white px-4 py-3 text-center text-sm text-slate-700 shadow-sm ring-1 ring-slate-200">
               {message}
+            </div>
+          )}
+
+          {checkinSaved && (
+            <div className="rounded-2xl border border-violet-100 bg-violet-50 p-5 text-center">
+              <p className="text-sm leading-7 text-slate-700">
+                今天的紀錄已經保存。可以先看看 Lumi 的回覆，
+                準備好後再前往反思。
+              </p>
+
+              <button
+                type="button"
+                onClick={() => navigate("/history")}
+                className="mt-4 rounded-full bg-violet-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-violet-700"
+              >
+                前往 History，開始反思 ➔
+              </button>
             </div>
           )}
 

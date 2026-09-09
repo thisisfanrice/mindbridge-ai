@@ -3,6 +3,8 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 
+const tutorRouter = require("./routes/tutor");
+const conversationRouter = require("./routes/conversation");
 const checkinRouter = require("./routes/checkin");
 const userRoutes = require("./routes/users");
 const analysisRoutes = require("./routes/analysis");
@@ -24,10 +26,12 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+app.use("/api/conversation", conversationRouter);
 app.use("/api/checkin", checkinRouter);
 app.use("/api/users", userRoutes);
 app.use("/api/analysis", analysisRoutes);
 app.use("/api/profile", profileRoutes);
+app.use("/api/tutor", tutorRouter);
 app.use(
   "/api/socratic",
   socraticRouter
