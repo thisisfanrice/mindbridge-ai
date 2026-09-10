@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from "../lib/apiFetch";
 import { useEffect, useRef, useState } from "react";
 import FocusTimer from "../components/FocusTimer";
 import { Link, useNavigate } from "react-router-dom";
@@ -8,6 +9,108 @@ type StudyTask = {
     text: string;
     completed: boolean;
 };
+
+
+type TutorCache = {
+    version: 1;
+    userId: string;
+    subject: string;
+    question: string;
+    submittedQuestion: string;
+    submittedAnswer: string;
+    tutorAnswer: string;
+    aiMessage: string;
+    aiQuestion: string;
+    tutorStage: "idle" | "question" | "complete";
+    tutorDemoMode: boolean;
+    inputType: "text" | "voice";
+    studyGoal: string;
+    studyTasks: StudyTask[];
+    planCompleted: boolean;
+    microPracticeCompleted: boolean;
+};
+
+function getTutorCacheKey(userId: string) {
+    return `mindbridge_tutor_state:${userId}`;
+}
+
+function isStudyTask(value: unknown): value is StudyTask {
+    if (!value || typeof value !== "object") return false;
+    const task = value as Record<string, unknown>;
+
+    return (
+        typeof task.id === "number" &&
+        typeof task.text === "string" &&
+        typeof task.completed === "boolean"
+    );
+}
+
+function readTutorCache(userId: string): TutorCache | null {
+    try {
+        const raw = localStorage.getItem(getTutorCacheKey(userId));
+        if (!raw) return null;
+
+        const parsed: unknown = JSON.parse(raw);
+        if (!parsed || typeof parsed !== "object") return null;
+
+        const data = parsed as Record<string, unknown>;
+        const stage = data.tutorStage;
+        const input = data.inputType;
+
+        if (
+            data.version !== 1 ||
+            data.userId !== userId ||
+            !["idle", "question", "complete"].includes(String(stage)) ||
+            !["text", "voice"].includes(String(input)) ||
+            !Array.isArray(data.studyTasks) ||
+            !data.studyTasks.every(isStudyTask)
+        ) {
+            return null;
+        }
+
+        return {
+            version: 1,
+            userId,
+            subject:
+                typeof data.subject === "string" ? data.subject : "數學",
+            question:
+                typeof data.question === "string" ? data.question : "",
+            submittedQuestion:
+                typeof data.submittedQuestion === "string"
+                    ? data.submittedQuestion
+                    : "",
+            submittedAnswer:
+                typeof data.submittedAnswer === "string"
+                    ? data.submittedAnswer
+                    : "",
+            tutorAnswer:
+                typeof data.tutorAnswer === "string"
+                    ? data.tutorAnswer
+                    : "",
+            aiMessage:
+                typeof data.aiMessage === "string"
+                    ? data.aiMessage
+                    : "",
+            aiQuestion:
+                typeof data.aiQuestion === "string"
+                    ? data.aiQuestion
+                    : "",
+            tutorStage: stage as TutorCache["tutorStage"],
+            tutorDemoMode: data.tutorDemoMode === true,
+            inputType: input as TutorCache["inputType"],
+            studyGoal:
+                typeof data.studyGoal === "string"
+                    ? data.studyGoal
+                    : "",
+            studyTasks: data.studyTasks,
+            planCompleted: data.planCompleted === true,
+            microPracticeCompleted:
+                data.microPracticeCompleted === true,
+        };
+    } catch {
+        return null;
+    }
+}
 
 // Demo 固定拆解，不宣稱已進行 AI 語意分析。
 function createDemoPlan(goal: string): StudyTask[] {
@@ -23,6 +126,7 @@ type TutorReply = {
     question: string;
     conversation_end: boolean;
     demo_mode: boolean;
+    posture_state: "listening" | "tutoring" | null;
 };
 
 type SpeechResult = {
@@ -63,6 +167,11 @@ function readTutorReply(value: unknown): TutorReply {
         question: typeof data.question === "string" ? data.question : "",
         conversation_end: data.conversation_end === true,
         demo_mode: data.demo_mode !== false,
+        posture_state:
+            data.posture_state === "listening" ||
+            data.posture_state === "tutoring"
+                ? data.posture_state
+                : null,
     };
 }
 
@@ -97,8 +206,10 @@ function Tutor() {
     const [microPracticeCompleted, setMicroPracticeCompleted] = useState(false);
     const [tutorStage, setTutorStage] = useState<"idle" | "question" | "complete">("idle");
     const [tutorDemoMode, setTutorDemoMode] = useState(false);
+    const [postureState, setPostureState] = useState<"listening" | "tutoring" | null>(null);
     const [listening, setListening] = useState(false);
     const [inputType, setInputType] = useState<"text" | "voice">("text");
+    const [cacheHydrated, setCacheHydrated] = useState(false);
 
     useEffect(() => {
         return () => {
@@ -126,6 +237,7 @@ function Tutor() {
         setAiQuestion("");
         setTutorStage("idle");
         setTutorDemoMode(false);
+        setPostureState(null);
         setInputType("text");
         setMessage("");
         setMicroPracticeCompleted(false);
@@ -187,7 +299,17 @@ function Tutor() {
     };
 
     const finishTutor = () => {
+        const userId = localStorage.getItem("mindbridge_user_id");
+
+        if (userId) {
+            localStorage.removeItem(getTutorCacheKey(userId));
+        }
+
+        setCacheHydrated(false);
         resetTutor();
+        resetPlan();
+        setStudyGoal("");
+        setQuestion("");
         navigate("/");
     };
 
@@ -204,6 +326,85 @@ function Tutor() {
     const [studyTasks, setStudyTasks] = useState<StudyTask[]>([]);
     const [planCompleted, setPlanCompleted] = useState(false);
     const [planMessage, setPlanMessage] = useState("");
+
+    useEffect(() => {
+        const userId = localStorage.getItem("mindbridge_user_id");
+
+        if (!userId) {
+            setCacheHydrated(true);
+            return;
+        }
+
+        const cached = readTutorCache(userId);
+
+        if (cached) {
+            setSubject(cached.subject);
+            setQuestion(cached.question);
+            setSubmittedQuestion(cached.submittedQuestion);
+            setSubmittedAnswer(cached.submittedAnswer);
+            setTutorAnswer(cached.tutorAnswer);
+            setAiMessage(cached.aiMessage);
+            setAiQuestion(cached.aiQuestion);
+            setTutorStage(cached.tutorStage);
+            setTutorDemoMode(cached.tutorDemoMode);
+            setInputType(cached.inputType);
+            setStudyGoal(cached.studyGoal);
+            setStudyTasks(cached.studyTasks);
+            setPlanCompleted(cached.planCompleted);
+            setMicroPracticeCompleted(
+                cached.microPracticeCompleted
+            );
+        }
+
+        setCacheHydrated(true);
+    }, []);
+
+    useEffect(() => {
+        if (!cacheHydrated) return;
+
+        const userId = localStorage.getItem("mindbridge_user_id");
+        if (!userId) return;
+
+        const cache: TutorCache = {
+            version: 1,
+            userId,
+            subject,
+            question,
+            submittedQuestion,
+            submittedAnswer,
+            tutorAnswer,
+            aiMessage,
+            aiQuestion,
+            tutorStage,
+            tutorDemoMode,
+            inputType,
+            studyGoal,
+            studyTasks,
+            planCompleted,
+            microPracticeCompleted,
+        };
+
+        localStorage.setItem(
+            getTutorCacheKey(userId),
+            JSON.stringify(cache)
+        );
+    }, [
+        cacheHydrated,
+        subject,
+        question,
+        submittedQuestion,
+        submittedAnswer,
+        tutorAnswer,
+        aiMessage,
+        aiQuestion,
+        tutorStage,
+        tutorDemoMode,
+        inputType,
+        studyGoal,
+        studyTasks,
+        planCompleted,
+        microPracticeCompleted,
+    ]);
 
     const createPlan = () => {
         const goal = studyGoal.trim();
@@ -268,8 +469,11 @@ function Tutor() {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                        message: `${subject}：${goal}`,
+                        message: goal,
                         input_type: "text",
+                        stage: "start",
+                        subject,
+                        original_question: goal,
                     }),
                     signal: controller.signal,
                 }
@@ -283,6 +487,7 @@ function Tutor() {
             setAiMessage(data.message);
             setAiQuestion(data.question);
             setTutorDemoMode(data.demo_mode);
+            setPostureState(data.posture_state);
             setTutorStage(data.conversation_end ? "complete" : "question");
         } catch (error) {
             if (requestId !== requestIdRef.current) return;
@@ -297,21 +502,76 @@ function Tutor() {
         }
     };
 
-    // 第一輪之後以本機固定收斂完成 Demo，不偽稱已呼叫語意分析。
-    const submitTutorAnswer = () => {
+    const submitTutorAnswer = async () => {
         const answer = tutorAnswer.trim();
         if (!answer || tutorStage !== "question" || loading) return;
+
         stopListening();
-        setSubmittedAnswer(answer);
-        setTutorAnswer("");
-        setAiQuestion("");
-        setTutorStage("complete");
-        setTutorDemoMode(true);
+        setLoading(true);
         setMessage("");
+
+        const requestId = ++requestIdRef.current;
+        const controller = new AbortController();
+        requestRef.current = controller;
+
+        try {
+            const response = await fetch(
+                `${import.meta.env.VITE_API_URL}/api/tutor`,
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        message: answer,
+                        input_type: inputType,
+                        stage: "followup",
+                        subject,
+                        original_question: submittedQuestion,
+                        tutor_question: aiQuestion,
+                    }),
+                    signal: controller.signal,
+                }
+            );
+
+            const raw = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    raw.message || "Unable to continue tutor session"
+                );
+            }
+
+            const data = readTutorReply(raw);
+
+            if (requestId !== requestIdRef.current) return;
+
+            setSubmittedAnswer(answer);
+            setTutorAnswer("");
+            setAiMessage(data.message);
+            setAiQuestion(data.question);
+            setTutorDemoMode(data.demo_mode);
+            setPostureState(data.posture_state);
+            setTutorStage(
+                data.conversation_end ? "complete" : "question"
+            );
+        } catch (error) {
+            if (requestId !== requestIdRef.current) return;
+
+            console.error("Tutor follow-up error:", error);
+            setMessage(
+                error instanceof Error
+                    ? error.message
+                    : "伴讀功能暫時無法使用。"
+            );
+        } finally {
+            if (requestId === requestIdRef.current) {
+                setLoading(false);
+                requestRef.current = null;
+            }
+        }
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 px-4 py-8">
+        <div className="min-h-screen mindbridge-page px-4 py-8">
             <div className="mx-auto max-w-3xl space-y-6">
                 <Link
                     to="/"
@@ -322,7 +582,7 @@ function Tutor() {
                 {/* Header */}
                 <div className="rounded-3xl bg-white p-6 text-center shadow-sm ring-1 ring-slate-200">
                     <p className="text-sm font-medium text-indigo-600">
-                        MindBridge AI Tutor
+                        MindBridge 心訊號 · AI Tutor
                     </p>
 
                     <h1 className="mt-2 text-2xl font-bold text-slate-900">
@@ -336,9 +596,16 @@ function Tutor() {
 
                 <LumiStatusBar
                     posture="tutoring"
-                    title="Lumi 伴讀中"
-                    message="不懂的概念或題目，讓 Lumi 陪你一步步整理。"
+                    postureState={postureState}
+                    title="橋寶伴讀中"
+                    message="不懂的概念或題目，讓橋寶陪你一步步整理。"
                 />
+
+                {cacheHydrated && submittedQuestion && (
+                    <p className="rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800">
+                        已恢復這個瀏覽器上次的伴讀進度。
+                    </p>
+                )}
 
                 {/* Subject */}
                 <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
@@ -486,7 +753,7 @@ function Tutor() {
                         disabled={loading}
                         className="mt-4 w-full rounded-2xl bg-indigo-600 px-6 py-3 font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {loading ? "Lumi 正在整理..." : "開始伴讀"}
+                        {loading ? "橋寶正在整理..." : "開始伴讀"}
                     </button>
 
                 </div>}
@@ -517,7 +784,7 @@ function Tutor() {
 
                         {(aiMessage || aiQuestion) && (
                             <section className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                                <h2 className="font-bold text-slate-800">Lumi 蘇格拉底式家教引導</h2>
+                                <h2 className="font-bold text-slate-800">橋寶蘇格拉底式家教引導</h2>
                                 {aiMessage && (
                                     <div className="mt-4 whitespace-pre-wrap rounded-2xl bg-indigo-50 p-4 leading-7 text-slate-700">
                                         {aiMessage}
@@ -525,7 +792,7 @@ function Tutor() {
                                 )}
                                 {aiQuestion && (
                                     <div className="mt-4 rounded-2xl bg-orange-50 p-4">
-                                        <p className="text-sm font-semibold text-orange-700">Lumi 想問你</p>
+                                        <p className="text-sm font-semibold text-orange-700">橋寶想問你</p>
                                         <p className="mt-2 leading-7 text-slate-700">{aiQuestion}</p>
                                     </div>
                                 )}
@@ -587,9 +854,13 @@ function Tutor() {
                                     </div>
                                 )}
                                 <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
-                                    <h2 className="font-bold text-slate-800">Lumi 觀念收斂與鼓勵</h2>
+                                    <h2 className="font-bold text-slate-800">橋寶的觀念收斂</h2>
                                     <p className="mt-3 leading-7 text-slate-700">
-                                        謝謝你把目前的想法整理出來。可以先對照課本或例題，確認自己的理解，再把還不確定的地方記下來。這次的回答尚未經過 AI 正確性判斷。
+                                        {aiMessage ||
+                                            "可以先對照課本或例題確認自己的理解，再把還不確定的地方記下來。"}
+                                    </p>
+                                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                                        Demo 模式不判斷你的答案是否正確；正式 AI 串接前，請以課本、老師或可靠解答為準。
                                     </p>
                                 </div>
                                 <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">

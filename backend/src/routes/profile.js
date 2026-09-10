@@ -124,7 +124,7 @@ router.get("/:userId", async (req, res) => {
       data: result.rows[0] || null,
     });
   } catch (error) {
-    console.error("Get profile error:", error);
+    console.error("Get profile error:", error && error.code ? error.code : "internal");
     return res.status(500).json({
       success: false,
       message: "Unable to load profile",
@@ -381,11 +381,11 @@ router.put("/:userId", async (req, res) => {
       try {
         await client.query("ROLLBACK");
       } catch (rollbackError) {
-        console.error("Profile rollback error:", rollbackError);
+        console.error("Profile rollback error:", rollbackError && rollbackError.code ? rollbackError.code : "internal");
       }
     }
 
-    console.error("Save profile error:", error);
+    console.error("Save profile error:", error && error.code ? error.code : "internal");
 
     if (error.code === "23503") {
       return badRequest(res, "Invalid user ID");

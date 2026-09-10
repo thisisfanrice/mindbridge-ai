@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from "../lib/apiFetch";
 import SocraticVoiceInput from "../components/SocraticVoiceInput";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -348,8 +349,63 @@ function History() {
         }
     };
 
-    // 從目前儲存的對話還原反思狀態，不會向後端送出新回答。
-    const restoreSocraticConversation = (
+    const applySocraticConversation = (
+        conversation: {
+            userId?: string;
+            conversationId?: string;
+            safetyEscalation?: boolean;
+            summaryState?: string;
+            message?: string;
+            question?: string;
+            conversationEnd?: boolean;
+            xaiReason?: string;
+            demoMode?: boolean;
+            actionText?: string;
+        }
+    ) => {
+        const currentUserId = localStorage.getItem(
+            "mindbridge_user_id"
+        );
+
+        if (
+            conversation.userId &&
+            conversation.userId !== currentUserId
+        ) {
+            return false;
+        }
+
+        setSocraticDemoMode(conversation.demoMode === true);
+        setSocraticAnswer("");
+        setSocraticAction(
+            conversation.conversationEnd === true &&
+            conversation.safetyEscalation !== true &&
+            typeof conversation.actionText === "string"
+                ? conversation.actionText
+                : ""
+        );
+        setSocraticReflection(conversation.message || "");
+
+        if (conversation.safetyEscalation === true) {
+            setSocraticQuestion("");
+            setSocraticCompleted(true);
+            setShowSafetyModal(true);
+            return true;
+        }
+
+        setShowSafetyModal(false);
+
+        if (conversation.conversationEnd === true) {
+            setSocraticQuestion("");
+            setSocraticCompleted(true);
+            return true;
+        }
+
+        setSocraticQuestion(conversation.question || "");
+        setSocraticCompleted(false);
+        return true;
+    };
+
+    const restoreSocraticConversationFromCache = (
         showMissingMessage = false
     ) => {
         try {
@@ -359,62 +415,121 @@ function History() {
 
             if (!rawConversation) {
                 if (showMissingMessage) {
-                    setMessage("找不到今天的 AI 對話，請先完成一次 Check-in。");
+                    setMessage(
+                        "找不到可恢復的反思對話，請先完成一次新的 Check-in。"
+                    );
                 }
-                return;
+                return false;
             }
 
             const conversation = JSON.parse(rawConversation);
-
-            // 避免把其他匿名使用者或不同 Check-in 的對話顯示在目前頁面。
-            const currentUserId = localStorage.getItem("mindbridge_user_id");
-            if (
-                conversation.userId &&
-                conversation.userId !== currentUserId
-            ) {
-                return;
-            }
-
-            setSocraticDemoMode(conversation.demoMode === true);
-            setSocraticAnswer("");
-            setSocraticAction(
-                conversation.conversationEnd === true &&
-                conversation.safetyEscalation !== true &&
-                typeof conversation.actionText === "string"
-                    ? conversation.actionText
-                    : ""
-            );
-            setSocraticReflection(conversation.message || "");
-
-            if (conversation.safetyEscalation === true) {
-                setSocraticQuestion("");
-                setSocraticCompleted(true);
-                setShowSafetyModal(true);
-                return;
-            }
-
-            if (conversation.conversationEnd === true) {
-                setSocraticQuestion("");
-                setSocraticCompleted(true);
-                return;
-            }
-
-            setSocraticQuestion(conversation.question || "");
-            setSocraticCompleted(false);
+            return applySocraticConversation(conversation);
         } catch (error) {
-            console.error("Load conversation error:", error);
+            console.error("Load conversation cache error:", error);
+
             if (showMissingMessage) {
-                setMessage("無法載入今天的反思對話。");
+                setMessage("無法載入本機反思快取。");
             }
+
+            return false;
         }
     };
 
-    const startSocraticReflection = () => {
+    const restoreSocraticConversation = async (
+        showMissingMessage = false
+    ) => {
+        try {
+            const userId = localStorage.getItem(
+                "mindbridge_user_id"
+            );
+
+            if (!userId) {
+                if (showMissingMessage) {
+                    setMessage("找不到目前匿名使用者。");
+                }
+                return false;
+            }
+
+            const response = await fetch(
+                `${import.meta.env.VITE_API_URL}/api/conversation/current`
+            );
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.message || "Unable to restore conversation"
+                );
+            }
+
+            if (!data.data) {
+                localStorage.removeItem(
+                    "mindbridge_active_conversation"
+                );
+                setSocraticQuestion("");
+                setSocraticReflection("");
+                setSocraticAction("");
+                setSocraticCompleted(false);
+                setShowSafetyModal(false);
+
+                if (showMissingMessage) {
+                    setMessage(
+                        "找不到可恢復的反思對話，請先完成一次新的 Check-in。"
+                    );
+                }
+
+                return false;
+            }
+
+            const restored = {
+                userId,
+                conversationId: data.data.conversation_id,
+                safetyEscalation:
+                    data.data.safety_escalation === true,
+                message: data.data.message ?? "",
+                question: data.data.question ?? "",
+                conversationEnd:
+                    data.data.conversation_end === true,
+                xaiReason: "",
+                demoMode: data.data.demo_mode === true,
+                actionText:
+                    typeof data.data.action_text === "string"
+                        ? data.data.action_text
+                        : "",
+            };
+
+            localStorage.setItem(
+                "mindbridge_active_conversation",
+                JSON.stringify(restored)
+            );
+
+            applySocraticConversation(restored);
+            return true;
+        } catch (error) {
+            console.error(
+                "Restore conversation from server error:",
+                error
+            );
+
+            const restoredFromCache =
+                restoreSocraticConversationFromCache(false);
+
+            if (!restoredFromCache && showMissingMessage) {
+                setMessage(
+                    "目前無法從伺服器恢復反思對話，請稍後再試。"
+                );
+            }
+
+            return restoredFromCache;
+        }
+    };
+
+    const startSocraticReflection = async () => {
         setSocraticLoading(true);
         setMessage("");
 
         try {
-            restoreSocraticConversation(true);
+            await restoreSocraticConversation(true);
         } finally {
             setSocraticLoading(false);
         }
@@ -457,7 +572,7 @@ function History() {
                 conversation.conversationEnd === true ||
                 conversation.safetyEscalation === true
             ) {
-                restoreSocraticConversation();
+                await restoreSocraticConversation();
                 setMessage("這段反思已經結束，無法再送出回答。");
                 return;
             }
@@ -611,36 +726,8 @@ function History() {
     };
 
     useEffect(() => {
-        // 頁面初始化時，只自動還原「已完成」的對話。
-        // 尚未完成的對話保留開始反思入口，等待使用者主動點擊。
-        try {
-            const rawConversation = localStorage.getItem(
-                "mindbridge_active_conversation"
-            );
-
-            if (rawConversation) {
-                const conversation = JSON.parse(rawConversation);
-                const currentUserId = localStorage.getItem(
-                    "mindbridge_user_id"
-                );
-
-                const belongsToCurrentUser =
-                    !conversation.userId ||
-                    conversation.userId === currentUserId;
-
-                if (
-                    belongsToCurrentUser &&
-                    (conversation.conversationEnd === true ||
-                        conversation.safetyEscalation === true)
-                ) {
-                    restoreSocraticConversation();
-                }
-            }
-        } catch (error) {
-            console.error("Restore conversation error:", error);
-        }
-
-        loadRecords();
+        void restoreSocraticConversation(false);
+        void loadRecords();
     }, []);
 
     /*
@@ -1020,7 +1107,7 @@ function History() {
 
     if (loading) {
         return (
-            <main className="min-h-screen bg-slate-50 px-4 py-8">
+            <main className="min-h-screen mindbridge-page px-4 py-8">
                 <div className="mx-auto max-w-6xl rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
                     <p className="text-slate-500">
                         正在整理你的紀錄...
@@ -1031,7 +1118,7 @@ function History() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
+        <main className="min-h-screen mindbridge-page px-4 py-8 sm:px-6">
             <div className="mx-auto max-w-6xl">
                 <Link
                     to="/"
@@ -1132,7 +1219,7 @@ function History() {
                             </h2>
 
                             <p className="text-sm text-slate-500">
-                                根據你允許使用的 Check-in 與個人化設定
+                                依照你的歷史分析與個人化偏好，提供一般性的紀錄整理
                             </p>
                         </div>
                     </div>
@@ -1217,7 +1304,7 @@ function History() {
                                     <div className="mt-5">
                                         <div className="rounded-2xl bg-white p-4 ring-1 ring-violet-100">
                                             <p className="text-xs font-semibold text-violet-500">
-                                                💡 Lumi 想問你
+                                                💡 橋寶想問你
                                             </p>
 
                                             <p className="mt-2 leading-7 text-slate-800">

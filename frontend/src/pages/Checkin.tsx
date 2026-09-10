@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from "../lib/apiFetch";
 import { useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import LumiStatusBar from "../components/LumiStatusBar";
@@ -390,6 +391,7 @@ function Checkin() {
         localStorage.setItem(
           "mindbridge_active_conversation",
           JSON.stringify({
+            userId,
             conversationId: data.conversation_id,
             safetyEscalation: data.safety_escalation ?? false,
             summaryState: data.summary_state ?? "",
@@ -428,7 +430,7 @@ function Checkin() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
+    <main className="min-h-screen mindbridge-page px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-3xl">
         <Link
           to="/"
@@ -453,7 +455,7 @@ function Checkin() {
 
         <LumiStatusBar
           posture="listening"
-          title="Lumi 陪伴中"
+          title="橋寶陪伴中"
           message={
             lumiMessage ||
             "可以用自己的步調，記錄今天的心情與想法。"
@@ -923,7 +925,7 @@ function Checkin() {
           {checkinSaved && (
             <div className="rounded-2xl border border-violet-100 bg-violet-50 p-5 text-center">
               <p className="text-sm leading-7 text-slate-700">
-                今天的紀錄已經保存。可以先看看 Lumi 的回覆，
+                今天的紀錄已經保存。可以先看看橋寶的回覆，
                 準備好後再前往反思。
               </p>
 

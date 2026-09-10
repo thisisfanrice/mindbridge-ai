@@ -83,9 +83,9 @@ router.post("/", async (req, res) => {
          conversation_end,
          safety_escalation
        FROM conversations
-       WHERE conversation_id = $1
+       WHERE conversation_id = $1 AND user_id = $2
        FOR UPDATE`,
-            [conversation_id]
+            [conversation_id, req.anonymousUserId]
         );
 
         if (conversationResult.rowCount === 0) {
@@ -241,11 +241,11 @@ router.post("/", async (req, res) => {
             try {
                 await client.query("ROLLBACK");
             } catch (rollbackError) {
-                console.error("Conversation rollback error:", rollbackError);
+                console.error("Conversation rollback error:", rollbackError && rollbackError.code ? rollbackError.code : "internal");
             }
         }
 
-        console.error("Conversation error:", error);
+        console.error("Conversation error:", error && error.code ? error.code : "internal");
 
         return res.status(500).json({
             success: false,
@@ -255,6 +255,158 @@ router.post("/", async (req, res) => {
         if (client) {
             client.release();
         }
+    }
+});
+
+
+
+/**
+ * GET /api/conversation/current
+ *
+ * Restores the latest conversation that belongs to the authenticated Session.
+ * The server is the source of truth; localStorage is only a display cache.
+ */
+router.get("/current", async (req, res) => {
+    try {
+        const conversationResult = await pool.query(
+            `SELECT
+                 conversation_id,
+                 checkin_id,
+                 conversation_end,
+                 safety_escalation,
+                 created_at,
+                 updated_at
+             FROM conversations
+             WHERE user_id = $1
+             ORDER BY updated_at DESC, created_at DESC
+             LIMIT 1`,
+            [req.anonymousUserId]
+        );
+
+        if (conversationResult.rowCount === 0) {
+            return res.status(200).json({
+                success: true,
+                data: null,
+            });
+        }
+
+        const conversation = conversationResult.rows[0];
+
+        const messagesResult = await pool.query(
+            `SELECT
+                 role,
+                 content,
+                 input_type,
+                 created_at,
+                 message_id
+             FROM conversation_messages
+             WHERE conversation_id = $1
+             ORDER BY created_at ASC, message_id ASC`,
+            [conversation.conversation_id]
+        );
+
+        const messages = messagesResult.rows;
+        const userTurns = Math.max(
+            0,
+            messages.filter((message) => message.role === "user").length - 1
+        );
+
+        const lastAssistant = [...messages]
+            .reverse()
+            .find((message) => message.role === "assistant");
+
+        let message = "";
+        let question = "";
+
+        if (lastAssistant && typeof lastAssistant.content === "string") {
+            const content = lastAssistant.content.trim();
+
+            if (
+                conversation.conversation_end === true ||
+                conversation.safety_escalation === true
+            ) {
+                message = content;
+            } else {
+                const parts = content
+                    .split(/\r?\n/)
+                    .map((part) => part.trim())
+                    .filter(Boolean);
+
+                if (parts.length >= 2) {
+                    question = parts.pop() || "";
+                    message = parts.join("\n");
+                } else {
+                    message = content;
+                }
+            }
+        }
+
+        const demoMode = process.env.AI_MODE !== "external";
+        const actionText =
+            demoMode &&
+            conversation.conversation_end === true &&
+            conversation.safety_escalation !== true
+                ? getDemoFinalResponse().action_text
+                : "";
+
+        return res.status(200).json({
+            success: true,
+            data: {
+                conversation_id: conversation.conversation_id,
+                checkin_id: conversation.checkin_id,
+                conversation_end: conversation.conversation_end === true,
+                safety_escalation: conversation.safety_escalation === true,
+                message,
+                question,
+                action_text: actionText,
+                demo_mode: demoMode,
+                conversation_turn: userTurns,
+            },
+        });
+    } catch (error) {
+        console.error(
+            "Restore conversation error:",
+            error && error.code ? error.code : "internal"
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to restore conversation",
+        });
+    }
+});
+
+/**
+ * DELETE /api/conversation/history
+ *
+ * Deletes only the authenticated user's AI conversation memory.
+ * Check-ins, profile settings and the user account remain untouched.
+ * conversation_messages are removed by ON DELETE CASCADE.
+ */
+router.delete("/history", async (req, res) => {
+    try {
+        const result = await pool.query(
+            `DELETE FROM conversations
+             WHERE user_id = $1
+             RETURNING conversation_id`,
+            [req.anonymousUserId]
+        );
+
+        return res.status(200).json({
+            success: true,
+            deleted_conversations: result.rowCount,
+            message: "AI conversation memory cleared",
+        });
+    } catch (error) {
+        console.error(
+            "Delete conversation history error:",
+            error && error.code ? error.code : "internal"
+        );
+
+        return res.status(500).json({
+            success: false,
+            message: "Unable to clear AI conversation memory",
+        });
     }
 });
 

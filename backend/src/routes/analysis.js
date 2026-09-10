@@ -415,21 +415,12 @@ function shouldShowSupportResources(recentRecords) {
 }
 router.post("/", async (req, res) => {
   try {
-    const {
-      userId,
-      completedDays = 0,
-      averageMood = null,
-      averageStress = null,
-      averageSleep = null,
-      recentRecords = [],
-    } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing userId",
-      });
-    }
+    const userId = req.anonymousUserId;
+    let completedDays = 0;
+    let averageMood = null;
+    let averageStress = null;
+    let averageSleep = null;
+    let recentRecords = [];
 
     /*
      * 讀取使用者個人化與分析權限
@@ -464,11 +455,9 @@ router.post("/", async (req, res) => {
      * 使用者關閉歷史分析
      */
     if (
-      profile &&
-      profile.allow_history_analysis === false
+      !profile ||
+      profile.allow_history_analysis !== true
     ) {
-      const attributionText =
-        await buildAttributionText(userId);
       return res.status(200).json({
         success: true,
 
@@ -485,12 +474,39 @@ router.post("/", async (req, res) => {
 
         analysisEnabled: false,
         usedProfileData: false,
+        attributionText: null,
+        showSupportResources: false,
+        safetyEscalation: false,
 
         // 舊版 History.tsx 相容
         summary:
           "你目前已關閉 Check-in 歷史分析。",
       });
     }
+
+    // All analysis inputs come from the authenticated user's database records.
+    // Never accept client-provided records, averages or counts as evidence.
+    const historyResult = await pool.query(
+      `SELECT mood_score, stress_score, sleep_score, note, checkin_date
+       FROM daily_checkins
+       WHERE user_id = $1
+         AND checkin_date >= CURRENT_DATE - INTERVAL '29 days'
+       ORDER BY checkin_date DESC`,
+      [userId]
+    );
+    recentRecords = historyResult.rows;
+    completedDays = recentRecords.length;
+    const average = (field) => {
+      const values = recentRecords.map(r => r[field]).filter(
+        value => typeof value === "number" && Number.isFinite(value)
+      );
+      return values.length
+        ? values.reduce((sum, value) => sum + value, 0) / values.length
+        : null;
+    };
+    averageMood = average("mood_score");
+    averageStress = average("stress_score");
+    averageSleep = average("sleep_score");
 
     /*
      * 沒有任何紀錄
@@ -602,10 +618,7 @@ router.post("/", async (req, res) => {
         personalized.insightText,
     });
   } catch (error) {
-    console.error(
-      "Analysis error:",
-      error
-    );
+    console.error("Analysis error:", error.code || "internal");
 
     return res.status(500).json({
       success: false,

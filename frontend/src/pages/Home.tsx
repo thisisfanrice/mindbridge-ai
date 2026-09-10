@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from "../lib/apiFetch";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import LumiStatusBar from "../components/LumiStatusBar";
@@ -8,12 +9,52 @@ import {
   type AnonymousProfile,
 } from "../lib/anonymousAvatar";
 
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function calculateCurrentStreak(records: Array<{ checkin_date?: string }>) {
+  const dateSet = new Set(
+    records
+      .map((record) =>
+        typeof record.checkin_date === "string"
+          ? record.checkin_date.slice(0, 10)
+          : ""
+      )
+      .filter(Boolean)
+  );
+
+  if (dateSet.size === 0) return 0;
+
+  const today = new Date();
+  const cursor = new Date(today);
+  const todayKey = toLocalDateKey(today);
+
+  if (!dateSet.has(todayKey)) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!dateSet.has(toLocalDateKey(cursor))) return 0;
+  }
+
+  let streak = 0;
+
+  while (dateSet.has(toLocalDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+}
+
 function Home() {
   const navigate = useNavigate();
   const [checkingUser, setCheckingUser] = useState(true);
   const [setupError, setSetupError] = useState("");
   const [anonymousProfile, setAnonymousProfile] =
     useState<AnonymousProfile | null>(null);
+  const [currentStreak, setCurrentStreak] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,23 +65,10 @@ function Home() {
 
         let userId = localStorage.getItem("mindbridge_user_id");
 
-        // 1. 沒有匿名使用者才建立
+        // AuthGate has verified the Cookie before this page mounts.
+        // Never create an account through the retired legacy endpoint.
         if (!userId) {
-          const response = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/users`,
-            { method: "POST" }
-          );
-
-          const data = await response.json();
-
-          if (!response.ok) {
-            throw new Error(data.message || "Unable to create user");
-          }
-
-          userId = data.data.user_id;
-          if (userId) {
-            localStorage.setItem("mindbridge_user_id", userId);
-          }
+          throw new Error("請先建立或恢復有效的匿名 Session。");
         }
 
         // 2. 一律向後端查詢正式完成狀態
@@ -55,6 +83,27 @@ function Home() {
         }
 
         const profile = data.data;
+
+
+        const streakResponse = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/checkin/${userId}`
+        );
+
+        const streakData = await streakResponse.json();
+
+        if (!streakResponse.ok) {
+          throw new Error(
+            streakData.message || "Unable to load check-in streak"
+          );
+        }
+
+        const streakRecords = Array.isArray(streakData.data)
+          ? streakData.data
+          : [];
+
+        if (!cancelled) {
+          setCurrentStreak(calculateCurrentStreak(streakRecords));
+        }
 
         // 使用後端資料顯示目前匿名使用者的頭像與暱稱。
         if (!cancelled && userId) {
@@ -108,7 +157,7 @@ function Home() {
 
   if (checkingUser) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <main className="flex min-h-screen items-center justify-center mindbridge-page px-4">
         <p className="text-slate-500">正在準備 MindBridge...</p>
       </main>
     );
@@ -116,7 +165,7 @@ function Home() {
 
   if (setupError) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <main className="flex min-h-screen items-center justify-center mindbridge-page px-4">
         <div className="max-w-md rounded-2xl bg-white p-6 text-center shadow-sm">
           <p className="font-semibold text-slate-800">
             暫時無法載入使用者資料
@@ -137,14 +186,14 @@ function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen mindbridge-page">
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-8 sm:px-8 lg:px-12">
 
         {/* Header */}
         <header className="mb-12 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-semibold tracking-wide text-indigo-600">
-              MINDBRIDGE AI
+              MindBridge 心訊號
             </p>
 
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
@@ -176,7 +225,7 @@ function Home() {
 
         <LumiStatusBar
           posture="listening"
-          title="Lumi 陪伴中"
+          title="橋寶陪伴中"
           message="可以用自己的步調，記錄今天的心情與想法。"
           className="mb-8"
         />
@@ -186,9 +235,18 @@ function Home() {
 
           {/* 左側 Hero */}
           <div>
-            <p className="mb-4 inline-flex rounded-full bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
-              每天 30 秒，累積更清楚的自己
-            </p>
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <p className="inline-flex rounded-full bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700">
+                每天 30 秒，累積更清楚的自己
+              </p>
+
+              <p
+                className="inline-flex rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700"
+                aria-label={`目前連續紀錄 ${currentStreak} 天`}
+              >
+                🔥 連續紀錄 {currentStreak} 天
+              </p>
+            </div>
 
             <h2 className="max-w-xl text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">
               不只是記錄心情，
@@ -198,7 +256,7 @@ function Home() {
             </h2>
 
             <p className="mt-6 max-w-xl text-base leading-8 text-slate-600 sm:text-lg">
-              MindBridge AI 透過每日 Check-in，整理心情、壓力與睡眠紀錄，
+              MindBridge 心訊號透過每日 Check-in，整理心情、壓力與睡眠紀錄，
               幫助你觀察近期變化，並提供個人化的狀態洞察。
             </p>
 
@@ -257,14 +315,14 @@ function Home() {
               </p>
             </Link>
 
-            {/* 趨勢分析 */}
+            {/* 伴讀學習 */}
             <Link
-              to="/history"
+              to="/tutor"
               className="group rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:ring-indigo-200"
             >
               <div className="mb-4 flex items-start justify-between">
                 <div className="text-3xl">
-                  📈
+                  📚
                 </div>
 
                 <span className="text-xl text-slate-300 transition duration-200 group-hover:translate-x-1 group-hover:text-indigo-500">
@@ -273,15 +331,15 @@ function Home() {
               </div>
 
               <h3 className="text-lg font-semibold text-slate-900">
-                趨勢分析
+                伴讀學習
               </h3>
 
               <p className="mt-2 leading-7 text-slate-600">
-                從單次感受變成可以觀察的長期變化。
+                從一個卡住的問題開始，透過循序引導與小任務，找到下一步。
               </p>
 
               <p className="mt-4 text-sm font-medium text-indigo-600 opacity-0 transition group-hover:opacity-100">
-                查看趨勢
+                開始伴讀
               </p>
             </Link>
 
@@ -318,7 +376,7 @@ function Home() {
 
         {/* Footer */}
         <footer className="mt-12 border-t border-slate-200 pt-6 text-sm text-slate-500">
-          MindBridge AI · AI 心理健康趨勢洞察與智慧支持平台
+          MindBridge 心訊號 · 心有靈析｜AI 日常狀態記錄與智慧支持平台
         </footer>
       </div>
     </main>

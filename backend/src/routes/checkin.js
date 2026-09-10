@@ -302,6 +302,8 @@ router.post("/", async (req, res) => {
 
       demo_mode: stage1Response.demo_mode === true,
 
+      posture_state: "listening",
+
       conversation_end:
         stage1Response.conversation_end,
 
@@ -312,7 +314,7 @@ router.post("/", async (req, res) => {
         conversationId,
     });
   } catch (error) {
-    console.error("Create check-in error:", error);
+    console.error("Create check-in error:", error && error.code ? error.code : "internal");
 
     if (error.code === "23503") {
       return res.status(400).json({
@@ -365,7 +367,7 @@ router.get("/:userId", async (req, res) => {
       data: result.rows,
     });
   } catch (error) {
-    console.error("Get check-ins error:", error);
+    console.error("Get check-ins error:", error && error.code ? error.code : "internal");
 
     return res.status(500).json({
       success: false,
@@ -490,7 +492,7 @@ router.put("/:checkinId", async (req, res) => {
       data: result.rows[0],
     });
   } catch (error) {
-    console.error("Update check-in error:", error);
+    console.error("Update check-in error:", error && error.code ? error.code : "internal");
 
     return res.status(500).json({
       success: false,
@@ -539,7 +541,7 @@ router.delete("/:checkinId", async (req, res) => {
       message: "Check-in deleted successfully",
     });
   } catch (error) {
-    console.error("Delete check-in error:", error);
+    console.error("Delete check-in error:", error && error.code ? error.code : "internal");
 
     return res.status(500).json({
       success: false,

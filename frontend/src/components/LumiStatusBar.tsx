@@ -22,7 +22,10 @@ const moodImages: Record<number, string> = {
 };
 
 const postureImages: Record<LumiPosture, string> = {
+    // 陪伴／傾聽：吉祥物 8，戴耳機
     listening: "/mascots/mascot-8.png",
+
+    // 伴讀／家教：吉祥物 7，拿鉛筆
     tutoring: "/mascots/mascot-7.png",
 };
 
@@ -58,13 +61,13 @@ export default function LumiStatusBar({
     const heading =
         title ??
         (resolvedPosture === "tutoring"
-            ? "Lumi 伴讀中"
-            : "Lumi 陪伴中");
+            ? "橋寶伴讀中"
+            : "橋寶陪伴中");
 
     const description =
         message ??
         (resolvedPosture === "tutoring"
-            ? "不懂的概念或題目，讓 Lumi 陪你一步步整理。"
+            ? "不懂的概念或題目，讓橋寶陪你一步步整理。"
             : "可以用自己的步調，記錄今天的心情與想法。");
 
     useEffect(() => {
@@ -103,15 +106,15 @@ export default function LumiStatusBar({
 
     return (
         <section
-            aria-label="Lumi 狀態"
-            className={`rounded-3xl border border-sky-100 bg-white p-4 shadow-sm sm:p-5 ${className}`}
+            aria-label="橋寶狀態"
+            className={`mindbridge-brand-gradient rounded-3xl border border-white/70 p-4 shadow-sm ring-1 ring-white/60 sm:p-5 ${className}`}
         >
             <div className="flex items-center gap-3 sm:gap-4">
                 <div className="relative h-20 w-20 shrink-0 sm:h-24 sm:w-24">
                     <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-full border border-sky-100 bg-sky-50">
                         <img
                             src={image}
-                            alt={validMood ? `Lumi 情緒 ${moodScore} 分造型` : `Lumi ${resolvedPosture === "tutoring" ? "伴讀" : "傾聽"}造型`}
+                            alt={validMood ? `橋寶情緒 ${moodScore} 分造型` : `橋寶${resolvedPosture === "tutoring" ? "伴讀" : "傾聽"}造型`}
                             className="h-full w-full object-contain p-1"
                         />
                     </div>
@@ -126,7 +129,7 @@ export default function LumiStatusBar({
                     </p>
                     <div className="mt-2 rounded-2xl bg-sky-50 px-3 py-2.5">
                         <p className="text-sm leading-6 text-slate-700">
-                            {loading ? "Lumi 正在整理中..." : description}
+                            {loading ? "橋寶正在整理中..." : description}
                         </p>
                     </div>
                 </div>
@@ -135,7 +138,7 @@ export default function LumiStatusBar({
                     type="button"
                     onClick={handleSpeech}
                     disabled={loading || !description.trim()}
-                    aria-label={speaking ? "停止朗讀" : "朗讀 Lumi 的話"}
+                    aria-label={speaking ? "停止朗讀" : "朗讀橋寶的話"}
                     title={speaking ? "停止朗讀" : "朗讀"}
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-sky-200 bg-white text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-500 disabled:cursor-not-allowed disabled:opacity-40"
                 >

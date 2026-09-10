@@ -1,9 +1,18 @@
+import { apiFetch as fetch } from "../lib/apiFetch";
 import {
     useEffect,
     useState,
 } from "react";
 
 import { Link, useNavigate } from "react-router-dom";
+import {
+    ANONYMOUS_AVATARS,
+    DEFAULT_NICKNAME,
+    cacheAnonymousProfile,
+    isAnonymousAvatarId,
+    randomAnonymousAvatarId,
+    type AnonymousAvatarId,
+} from "../lib/anonymousAvatar";
 
 type Option = {
     value: string;
@@ -174,6 +183,10 @@ const socraticOptions: Option[] = [
 
 function Onboarding() {
     const navigate = useNavigate();
+    const [nickname, setNickname] = useState(DEFAULT_NICKNAME);
+    const [avatarId, setAvatarId] = useState<AnonymousAvatarId>(() =>
+        randomAnonymousAvatarId()
+    );
     const [
         userIdentity,
         setUserIdentity,
@@ -286,6 +299,21 @@ function Onboarding() {
 
                     const profile =
                         data.data;
+
+                    if (isAnonymousAvatarId(profile.avatar_id)) {
+                        setAvatarId(profile.avatar_id);
+                    }
+
+                    setNickname(
+                        typeof profile.nickname === "string" &&
+                        profile.nickname.trim()
+                            ? profile.nickname.trim()
+                            : DEFAULT_NICKNAME
+                    );
+
+                    setPrivacyAgreed(
+                        profile.privacy_agreed ?? false
+                    );
 
                     setUserIdentity(
                         profile.user_identity ||
@@ -405,9 +433,22 @@ function Onboarding() {
 
                 if (!termsAccepted || !privacyAgreed) {
                     setMessage(
-                        "請先閱讀並同意 MindBridge 使用服務條款與匿名資料隱私政策。"
+                        "請先閱讀並同意 MindBridge 心訊號 使用服務條款與匿名資料隱私政策。"
                     );
 
+                    return;
+                }
+
+                const trimmedNickname = nickname.trim();
+
+                if (
+                    Array.from(trimmedNickname).length < 1 ||
+                    Array.from(trimmedNickname).length > 20 ||
+                    /[\u0000-\u001f\u007f]/u.test(trimmedNickname)
+                ) {
+                    setMessage(
+                        "匿名暱稱請輸入 1–20 個字，且不可包含換行或控制字元。"
+                    );
                     return;
                 }
 
@@ -441,6 +482,8 @@ function Onboarding() {
 
                             body:
                                 JSON.stringify({
+                                    nickname: trimmedNickname,
+                                    avatarId,
                                     userIdentity,
                                     ageRange,
                                     stressSources,
@@ -466,6 +509,12 @@ function Onboarding() {
                         "Unable to save profile"
                     );
                 }
+
+                cacheAnonymousProfile({
+                    userId,
+                    nickname: trimmedNickname,
+                    avatarId,
+                });
 
                 localStorage.setItem(
                     "mindbridge_has_completed_onboarding",
@@ -503,7 +552,7 @@ function Onboarding() {
 
     if (loading) {
         return (
-            <main className="min-h-screen bg-slate-50 px-4 py-8">
+            <main className="min-h-screen mindbridge-page px-4 py-8">
                 <div className="mx-auto max-w-4xl rounded-3xl bg-white p-8 text-center shadow-sm ring-1 ring-slate-200">
                     <p className="text-slate-500">
                         正在載入設定...
@@ -514,7 +563,7 @@ function Onboarding() {
     }
 
     return (
-        <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
+        <main className="min-h-screen mindbridge-page px-4 py-8 sm:px-6">
             <div className="mx-auto max-w-4xl">
                 <Link
                     to="/"
@@ -529,7 +578,7 @@ function Onboarding() {
                     </p>
 
                     <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
-                        讓 MindBridge 更了解你的偏好
+                        讓 MindBridge 心訊號 更了解你的偏好
                     </h1>
 
                     <p className="mt-3 max-w-2xl leading-7 text-slate-600">
@@ -538,7 +587,120 @@ function Onboarding() {
                     </p>
                 </header>
 
-                <div className="grid gap-6 lg:grid-cols-2">
+                <ProfileCard title="選擇你的匿名陪伴夥伴">
+                    <div className="flex flex-col gap-5">
+                        <div className="flex flex-wrap items-center gap-4 rounded-2xl mindbridge-brand-gradient p-4 ring-1 ring-white/70">
+                            <div
+                                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-white/90 text-4xl shadow-sm"
+                                aria-hidden="true"
+                            >
+                                {ANONYMOUS_AVATARS.find(
+                                    (avatar) => avatar.id === avatarId
+                                )?.emoji}
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-slate-800">
+                                    橋寶會用這個匿名夥伴認得你
+                                </p>
+                                <p className="mt-1 text-sm leading-6 text-slate-600">
+                                    不需要真實姓名、學校或聯絡方式，之後也能在個人設定更換。
+                                </p>
+                                <p className="mt-2 text-sm font-semibold text-indigo-700">
+                                    {nickname.trim() || DEFAULT_NICKNAME}
+                                </p>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const choices = ANONYMOUS_AVATARS.filter(
+                                        (avatar) => avatar.id !== avatarId
+                                    );
+                                    const next =
+                                        choices[
+                                            Math.floor(
+                                                Math.random() * choices.length
+                                            )
+                                        ];
+                                    setAvatarId(next.id);
+                                }}
+                                disabled={saving}
+                                className="rounded-full border border-indigo-200 bg-white/85 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-white disabled:opacity-50"
+                            >
+                                🎲 隨機換一隻
+                            </button>
+                        </div>
+
+                        <div>
+                            <label
+                                htmlFor="onboarding-nickname"
+                                className="text-sm font-semibold text-slate-700"
+                            >
+                                匿名暱稱
+                            </label>
+                            <input
+                                id="onboarding-nickname"
+                                type="text"
+                                value={nickname}
+                                onChange={(event) =>
+                                    setNickname(event.target.value)
+                                }
+                                maxLength={20}
+                                autoComplete="off"
+                                disabled={saving}
+                                placeholder="例如：小星星"
+                                className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:opacity-50"
+                            />
+                            <p className="mt-2 text-xs leading-5 text-slate-500">
+                                1–20 個字，建議不要使用可直接辨識你的真實資訊。
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            {ANONYMOUS_AVATARS.map((avatar) => {
+                                const selected = avatar.id === avatarId;
+
+                                return (
+                                    <button
+                                        key={avatar.id}
+                                        type="button"
+                                        onClick={() => setAvatarId(avatar.id)}
+                                        disabled={saving}
+                                        aria-pressed={selected}
+                                        aria-label={`選擇${avatar.label}`}
+                                        className={`flex flex-col items-center gap-2 rounded-2xl border p-4 transition focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50 ${
+                                            selected
+                                                ? "border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100"
+                                                : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        <span
+                                            aria-hidden="true"
+                                            className={`flex h-14 w-14 items-center justify-center rounded-full text-3xl ${avatar.background}`}
+                                        >
+                                            {avatar.emoji}
+                                        </span>
+                                        <span className="text-sm font-medium text-slate-700">
+                                            {avatar.label}
+                                        </span>
+                                        <span
+                                            className={`text-xs ${
+                                                selected
+                                                    ? "font-semibold text-indigo-600"
+                                                    : "text-slate-400"
+                                            }`}
+                                        >
+                                            {selected ? "✓ 已選擇" : "點選更換"}
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </ProfileCard>
+
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
                     {/* Identity */}
                     <ProfileCard
                         title="您目前的身分是？"
@@ -711,7 +873,7 @@ function Onboarding() {
                 {/* Terms */}
                 <ProfileCard title="使用條款與匿名資料隱私政策確認">
                     <div className="space-y-5">
-                        {/* MindBridge 使用服務條款 */}
+                        {/* MindBridge 心訊號 使用服務條款 */}
                         <label className="flex items-start gap-3">
                             <input
                                 type="checkbox"
@@ -730,12 +892,12 @@ function Onboarding() {
                                     }}
                                     className="font-medium text-indigo-600 hover:text-indigo-800"
                                 >
-                                    《MindBridge 使用服務條款》
+                                    《MindBridge 心訊號 使用服務條款》
                                 </button>
                             </span>
                         </label>
 
-                        {/* MindBridge 匿名資料與隱私政策 */}
+                        {/* MindBridge 心訊號 匿名資料與隱私政策 */}
                         <label className="flex items-start gap-3">
                             <input
                                 type="checkbox"
@@ -754,7 +916,7 @@ function Onboarding() {
                                     }}
                                     className="font-medium text-indigo-600 hover:text-indigo-800"
                                 >
-                                    《MindBridge 匿名資料與隱私政策》
+                                    《MindBridge 心訊號 匿名資料與隱私政策》
                                 </button>
                             </span>
                         </label>
@@ -762,15 +924,15 @@ function Onboarding() {
 
                     <div className="mt-6 rounded-2xl bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-500">
                         <p>
-                            兩項皆需勾選同意後，才能完成設定並開始使用 MindBridge。
+                            兩項皆需勾選同意後，才能完成設定並開始使用 MindBridge 心訊號。
                         </p>
                         <p>
-                            MindBridge 提供日常紀錄、自我覺察、AI 陪伴與趨勢整理，不作為醫療診斷或正式心理治療。
+                            MindBridge 心訊號 提供日常紀錄、自我覺察、AI 陪伴與趨勢整理，不作為醫療診斷或正式心理治療。
                         </p>
                     </div>
                 </ProfileCard>
 
-                {/* MindBridge 使用服務條款 Modal */}
+                {/* MindBridge 心訊號 使用服務條款 Modal */}
                 {termsModalOpen && (
                     <div
                         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-4"
@@ -790,7 +952,7 @@ function Onboarding() {
                                         id="terms-modal-title"
                                         className="text-xl font-bold text-slate-900"
                                     >
-                                        MindBridge 使用服務條款
+                                        MindBridge 心訊號 使用服務條款
                                     </h2>
                                     <p className="mt-1 text-sm text-slate-500">
                                         請閱讀以下內容後，再決定是否同意。
@@ -815,7 +977,7 @@ function Onboarding() {
                                             4.1 服務定位
                                         </h3>
                                         <p>
-                                            MindBridge 為 AI 輔助之日常情緒紀錄、自我覺察、心理陪伴與趨勢分析工具。
+                                            MindBridge 心訊號 為 AI 輔助之日常情緒紀錄、自我覺察、心理陪伴與趨勢分析工具。
                                         </p>
                                         <p className="mt-2">
                                             系統透過使用者主動提供的資料與內容，協助整理情緒、想法與生活壓力。
@@ -827,7 +989,7 @@ function Onboarding() {
                                             4.2 非醫療與非診斷服務
                                         </h3>
                                         <p>
-                                            MindBridge 不提供醫療診斷、精神疾病判定、正式心理治療或處方建議。
+                                            MindBridge 心訊號 不提供醫療診斷、精神疾病判定、正式心理治療或處方建議。
                                         </p>
                                         <p className="mt-2">
                                             AI 所提供的內容不得視為醫師、心理師或其他專業人員服務的替代。
@@ -861,7 +1023,7 @@ function Onboarding() {
                                             4.5 服務調整
                                         </h3>
                                         <p>
-                                            MindBridge 得基於系統安全、服務優化與功能改善需求，
+                                            MindBridge 心訊號 得基於系統安全、服務優化與功能改善需求，
                                             調整 AI 回應邏輯、功能或相關規則。
                                         </p>
                                     </section>
@@ -884,7 +1046,7 @@ function Onboarding() {
                     </div>
                 )}
 
-                {/* MindBridge 匿名資料與隱私政策 Modal */}
+                {/* MindBridge 心訊號 匿名資料與隱私政策 Modal */}
                 {dataModalOpen && (
                     <div
                         className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-4"
@@ -904,10 +1066,10 @@ function Onboarding() {
                                         id="privacy-modal-title"
                                         className="text-xl font-bold text-slate-900"
                                     >
-                                        MindBridge 匿名資料與隱私政策
+                                        MindBridge 心訊號 匿名資料與隱私政策
                                     </h2>
                                     <p className="mt-1 text-sm text-slate-500">
-                                        說明 MindBridge 會處理哪些資料，以及資料的使用方式。
+                                        說明 MindBridge 心訊號 會處理哪些資料，以及資料的使用方式。
                                     </p>
                                 </div>
 
@@ -929,7 +1091,7 @@ function Onboarding() {
                                             5.1 匿名化原則
                                         </h3>
                                         <p>
-                                            MindBridge 以降低直接識別個人身分資料蒐集為原則。
+                                            MindBridge 心訊號 以降低直接識別個人身分資料蒐集為原則。
                                         </p>
                                         <p className="mt-2">
                                             使用者不需提供真實姓名等非必要個人資訊。

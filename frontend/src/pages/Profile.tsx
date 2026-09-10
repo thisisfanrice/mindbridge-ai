@@ -1,3 +1,4 @@
+import { apiFetch as fetch } from "../lib/apiFetch";
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -58,6 +59,46 @@ function getOptionLabel(options: Option[], value: string) {
   return options.find((option) => option.value === value)?.label || "尚未設定";
 }
 
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function calculateCurrentStreak(records: Array<{ checkin_date?: string }>) {
+  const dateSet = new Set(
+    records
+      .map((record) =>
+        typeof record.checkin_date === "string"
+          ? record.checkin_date.slice(0, 10)
+          : ""
+      )
+      .filter(Boolean)
+  );
+
+  if (dateSet.size === 0) return 0;
+
+  const today = new Date();
+  const cursor = new Date(today);
+  const todayKey = toLocalDateKey(today);
+
+  // 今天尚未 Check-in 時，只要昨天有紀錄，連續天數仍視為進行中。
+  if (!dateSet.has(todayKey)) {
+    cursor.setDate(cursor.getDate() - 1);
+    if (!dateSet.has(toLocalDateKey(cursor))) return 0;
+  }
+
+  let streak = 0;
+
+  while (dateSet.has(toLocalDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  return streak;
+}
+
 function Profile() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [nickname, setNickname] = useState(DEFAULT_NICKNAME);
@@ -78,6 +119,10 @@ function Profile() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [memoryDeleteOpen, setMemoryDeleteOpen] = useState(false);
+  const [deletingMemory, setDeletingMemory] = useState(false);
+  const [memoryDeleteMessage, setMemoryDeleteMessage] = useState("");
+  const [currentStreak, setCurrentStreak] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +148,27 @@ function Profile() {
         if (cancelled) return;
 
         let saved: ProfileData = data.data || {};
+
+
+        const streakResponse = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/checkin/${userId}`
+        );
+
+        const streakData = await streakResponse.json();
+
+        if (!streakResponse.ok) {
+          throw new Error(
+            streakData.message || "無法載入連續紀錄"
+          );
+        }
+
+        const streakRecords = Array.isArray(streakData.data)
+          ? streakData.data
+          : [];
+
+        if (!cancelled) {
+          setCurrentStreak(calculateCurrentStreak(streakRecords));
+        }
         let selectedAvatar: AnonymousAvatarId;
 
         if (isAnonymousAvatarId(saved.avatar_id)) {
@@ -252,9 +318,50 @@ function Profile() {
     }
   };
 
+
+  const handleDeleteConversationMemory = async () => {
+    if (deletingMemory) return;
+
+    try {
+      setDeletingMemory(true);
+      setMemoryDeleteMessage("");
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/conversation/history`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "無法清除 AI 歷史對話記憶"
+        );
+      }
+
+      localStorage.removeItem("mindbridge_active_conversation");
+      setMemoryDeleteOpen(false);
+      setMemoryDeleteMessage(
+        `已清除 ${Number(data.deleted_conversations) || 0} 段 AI 歷史對話記憶。Check-in、個人設定與匿名帳號均保留。`
+      );
+    } catch (err) {
+      setMemoryDeleteMessage(
+        err instanceof Error
+          ? err.message
+          : "清除 AI 歷史對話記憶失敗"
+      );
+    } finally {
+      setDeletingMemory(false);
+    }
+  };
+
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      <main className="flex min-h-screen items-center justify-center mindbridge-page px-4">
         <p className="text-slate-500">正在載入個人設定...</p>
       </main>
     );
@@ -262,7 +369,7 @@ function Profile() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-slate-50 px-4 py-8">
+      <main className="min-h-screen mindbridge-page px-4 py-8">
         <div className="mx-auto max-w-2xl rounded-3xl bg-white p-6 text-center shadow-sm">
           <p className="font-semibold text-slate-800">暫時無法載入設定</p>
           <p className="mt-2 text-sm text-slate-500">{error}</p>
@@ -275,7 +382,7 @@ function Profile() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6">
+    <main className="min-h-screen mindbridge-page px-4 py-8 sm:px-6">
       <div className="mx-auto max-w-3xl space-y-6">
         <Link
           to="/"
@@ -285,7 +392,7 @@ function Profile() {
         </Link>
 
         <header className="pt-2">
-          <p className="text-sm font-semibold text-indigo-600">MINDBRIDGE</p>
+          <p className="text-sm font-semibold text-indigo-600">MindBridge 心訊號</p>
           <h1 className="mt-2 text-3xl font-bold text-slate-900">個人設定</h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">
             管理你的匿名資料、陪伴偏好與資料使用設定。
@@ -301,11 +408,27 @@ function Profile() {
             >
               {ANONYMOUS_AVATARS.find((item) => item.id === avatarId)?.emoji}
             </div>
+
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-bold text-slate-900">匿名個人檔案</h2>
-              <p className="mt-1 text-sm text-slate-500">
-                選一個喜歡的動物，讓 Lumi 知道怎麼稱呼你。
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">匿名個人檔案</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    選一個喜歡的動物，讓橋寶知道怎麼稱呼你。
+                  </p>
+                </div>
+
+                <div
+                  className="rounded-2xl bg-amber-50 px-4 py-3 text-right ring-1 ring-amber-100"
+                  aria-label={`目前已連續陪伴 ${currentStreak} 天`}
+                >
+                  <p className="text-xs font-medium text-amber-600">連續陪伴</p>
+                  <p className="mt-1 text-base font-bold text-amber-800">
+                    🔥 已連續陪伴 {currentStreak} 天
+                  </p>
+                </div>
+              </div>
+
               <p className="mt-2 text-sm font-medium text-indigo-700">
                 {nickname.trim() || DEFAULT_NICKNAME}
               </p>
@@ -546,7 +669,7 @@ function Profile() {
               <div>
                 <p className="font-medium text-slate-800">歷史紀錄分析偏好</p>
                 <p className="mt-1 text-sm leading-6 text-slate-500">
-                  允許使用既有紀錄提供近期趨勢整理。
+                  允許系統使用過去的 Check-in 產生 AI 趨勢整理與一般建議。關閉後仍可自行查看原始紀錄、統計數值與圖表。
                 </p>
               </div>
               <button
@@ -568,17 +691,81 @@ function Profile() {
             <div className="border-t border-slate-100 pt-5">
               <button
                 type="button"
-                disabled
-                className="w-full rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-500 disabled:cursor-not-allowed"
+                onClick={() => {
+                  setMemoryDeleteMessage("");
+                  setMemoryDeleteOpen(true);
+                }}
+                disabled={deletingMemory}
+                className="w-full rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                清除所有 AI 歷史對話記憶
+                {deletingMemory ? "正在清除..." : "清除所有 AI 歷史對話記憶"}
               </button>
               <p className="mt-2 text-xs leading-5 text-slate-500">
-                此功能待後端刪除 API 串接完成後開放。目前不會刪除任何紀錄。
+                只清除 AI 對話與反思記憶，不會刪除 Check-in、個人設定、頭像或匿名帳號。
               </p>
+
+              {memoryDeleteMessage && (
+                <p
+                  className="mt-3 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-700"
+                  role="status"
+                >
+                  {memoryDeleteMessage}
+                </p>
+              )}
             </div>
           </div>
         </section>
+
+        {memoryDeleteOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget && !deletingMemory) {
+                setMemoryDeleteOpen(false);
+              }
+            }}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="memory-delete-title"
+              className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl"
+            >
+              <h2 id="memory-delete-title" className="text-xl font-bold text-slate-900">
+                確定清除 AI 歷史對話記憶？
+              </h2>
+
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                這會永久刪除目前匿名帳號的 AI 對話與反思訊息。
+                Check-in、個人設定、頭像與帳號本身都會保留。
+              </p>
+
+              <p className="mt-3 rounded-xl bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+                清除後無法從網站復原這些對話內容。
+              </p>
+
+              <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setMemoryDeleteOpen(false)}
+                  disabled={deletingMemory}
+                  className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50"
+                >
+                  取消
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteConversationMemory}
+                  disabled={deletingMemory}
+                  className="rounded-xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {deletingMemory ? "清除中..." : "確認清除"}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
 
         <button
           type="button"

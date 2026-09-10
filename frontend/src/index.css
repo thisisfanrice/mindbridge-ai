@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+@theme {
+  --color-mindbridge-sky: #E0F2FE;
+  --color-mindbridge-lavender: #F3E8FF;
+}
+
+:root {
+  --mindbridge-gradient-start: #E0F2FE;
+  --mindbridge-gradient-end: #F3E8FF;
+  --mindbridge-surface: rgba(255, 255, 255, 0.92);
+}
+
 body {
   margin: 0;
   font-family:
@@ -7,8 +18,33 @@ body {
     "Noto Sans TC",
     "Microsoft JhengHei",
     sans-serif;
-  background: #f7f9fc;
+  background:
+    linear-gradient(
+      135deg,
+      var(--mindbridge-gradient-start) 0%,
+      var(--mindbridge-gradient-end) 100%
+    );
+  background-attachment: fixed;
   color: #1f2937;
+}
+
+.mindbridge-page {
+  min-height: 100vh;
+  background:
+    linear-gradient(
+      135deg,
+      var(--mindbridge-gradient-start) 0%,
+      var(--mindbridge-gradient-end) 100%
+    );
+}
+
+.mindbridge-brand-gradient {
+  background:
+    linear-gradient(
+      90deg,
+      var(--mindbridge-gradient-start) 0%,
+      var(--mindbridge-gradient-end) 100%
+    );
 }
 
 * {
