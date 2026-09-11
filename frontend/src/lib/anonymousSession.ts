@@ -1,6 +1,8 @@
 // Cookie-based anonymous session client.
 // Never put the raw credential in JavaScript storage or URL parameters.
-const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const API_URL = import.meta.env.DEV
+  ? (import.meta.env.VITE_API_URL || "http://127.0.0.1:3000").replace(/\/$/, "")
+  : "";
 
 export class SessionHttpError extends Error {
   public readonly status: number;

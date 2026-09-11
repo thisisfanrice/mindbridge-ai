@@ -1,4 +1,6 @@
-const API_URL = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+const API_URL = import.meta.env.DEV
+  ? (import.meta.env.VITE_API_URL || "http://127.0.0.1:3000").replace(/\/$/, "")
+  : "";
 
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const url = typeof input === "string" && input.startsWith("/api/")
