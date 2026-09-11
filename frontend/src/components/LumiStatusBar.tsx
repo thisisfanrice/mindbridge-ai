@@ -118,9 +118,6 @@ export default function LumiStatusBar({
                             className="h-full w-full object-contain p-1"
                         />
                     </div>
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500 ring-1 ring-slate-200">
-                        吉祥物
-                    </span>
                 </div>
 
                 <div className="min-w-0 flex-1">
