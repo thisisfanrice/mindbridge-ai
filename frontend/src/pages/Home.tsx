@@ -73,7 +73,7 @@ function Home() {
 
         // 2. 一律向後端查詢正式完成狀態
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/profile/${userId}`
+          `/api/profile/${userId}`
         );
 
         const data = await response.json();
@@ -86,7 +86,7 @@ function Home() {
 
 
         const streakResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/checkin/${userId}`
+          `/api/checkin/${userId}`
         );
 
         const streakData = await streakResponse.json();

@@ -136,7 +136,7 @@ function Profile() {
         }
 
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/profile/${userId}`
+          `/api/profile/${userId}`
         );
 
         const data = await response.json();
@@ -151,7 +151,7 @@ function Profile() {
 
 
         const streakResponse = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/checkin/${userId}`
+          `/api/checkin/${userId}`
         );
 
         const streakData = await streakResponse.json();
@@ -178,7 +178,7 @@ function Profile() {
           if (!cancelled) setAvatarSaving(true);
           try {
             const avatarResponse = await fetch(
-              `${import.meta.env.VITE_API_URL}/api/profile/${userId}`,
+              `/api/profile/${userId}`,
               {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
@@ -279,7 +279,7 @@ function Profile() {
       };
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/profile/${userId}`,
+        `/api/profile/${userId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -327,7 +327,7 @@ function Profile() {
       setMemoryDeleteMessage("");
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/conversation/history`,
+        `/api/conversation/history`,
         {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },

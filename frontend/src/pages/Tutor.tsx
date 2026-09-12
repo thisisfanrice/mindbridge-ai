@@ -464,7 +464,7 @@ function Tutor() {
 
         try {
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL}/api/tutor`,
+                `/api/tutor`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -516,7 +516,7 @@ function Tutor() {
 
         try {
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL}/api/tutor`,
+                `/api/tutor`,
                 {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },

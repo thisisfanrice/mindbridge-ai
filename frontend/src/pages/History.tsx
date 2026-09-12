@@ -278,8 +278,7 @@ function History() {
                 );
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL
-                }/api/analysis`,
+                `/api/analysis`,
                 {
                     method: "POST",
 
@@ -451,7 +450,7 @@ function History() {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL}/api/conversation/current`
+                `/api/conversation/current`
             );
 
             const data = await response.json();
@@ -578,7 +577,7 @@ function History() {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL}/api/conversation`,
+                `/api/conversation`,
                 {
                     method: "POST",
                     headers: {
@@ -686,8 +685,7 @@ function History() {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL
-                }/api/checkin/${userId}`
+                `/api/checkin/${userId}`
             );
 
             const data = await response.json();
@@ -943,8 +941,7 @@ function History() {
             setMessage("");
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL
-                }/api/checkin/${checkinId}`,
+                `/api/checkin/${checkinId}`,
                 {
                     method: "PUT",
 
@@ -1048,8 +1045,7 @@ function History() {
             }
 
             const response = await fetch(
-                `${import.meta.env.VITE_API_URL
-                }/api/checkin/${checkinId}`,
+                `/api/checkin/${checkinId}`,
                 {
                     method: "DELETE",
 

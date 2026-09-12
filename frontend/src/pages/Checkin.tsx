@@ -351,8 +351,7 @@ function Checkin() {
       setSaving(true);
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL
-        }/api/checkin`,
+        `/api/checkin`,
         {
           method: "POST",
 

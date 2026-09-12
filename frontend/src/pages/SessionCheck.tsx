@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { apiFetch } from "../lib/apiFetch";
 
 type CheckResult = {
   status: number | null;
@@ -19,9 +20,7 @@ export default function SessionCheck() {
     async function checkSession() {
       try {
         const legacyUserId = localStorage.getItem("mindbridge_user_id");
-        const apiUrl = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-
-        const response = await fetch(`${apiUrl}/api/session/me`, {
+        const response = await apiFetch("/api/session/me", {
           method: "GET",
           credentials: "include",
           cache: "no-store",

@@ -278,9 +278,7 @@ function Onboarding() {
 
                     const response =
                         await fetch(
-                            `${import.meta.env
-                                .VITE_API_URL
-                            }/api/profile/${userId}`
+                            `/api/profile/${userId}`
                         );
 
                     const data =
@@ -469,9 +467,7 @@ function Onboarding() {
 
                 const response =
                     await fetch(
-                        `${import.meta.env
-                            .VITE_API_URL
-                        }/api/profile/${userId}`,
+                        `/api/profile/${userId}`,
                         {
                             method: "PUT",
 
