@@ -70,6 +70,126 @@ const mockTrendData = [
     { date: "8/19", mood: 3, stress: 7, sleep: 5, energy: 3 },
 ];
 
+const recordingDemoTemplates = [
+    {
+        mood: 4, stress: 5, sleep: 7, energy: 4,
+        note: "今天把三角函數錯題重新整理了一次，雖然還有幾題會卡住，但比前幾天更知道自己錯在哪裡。",
+        inputType: "text" as const,
+    },
+    {
+        mood: 4, stress: 6, sleep: 6, energy: 3,
+        note: "模擬考快到了，今天複習數學比較久，sin、cos 的邊還是偶爾會搞混。",
+        inputType: "voice" as const,
+    },
+    {
+        mood: 3, stress: 7, sleep: 5, energy: 3,
+        note: "昨天讀到比較晚，今天有點累。看到三角函數題目時會先緊張，怕時間不夠。",
+        inputType: "text" as const,
+    },
+    {
+        mood: 3, stress: 7, sleep: 5, energy: 2,
+        note: "今天進度落後一點，想到模擬考就有壓力，數學題目寫得比預期慢。",
+        inputType: "voice" as const,
+    },
+    {
+        mood: 2, stress: 8, sleep: 4, energy: 2,
+        note: "昨晚睡得不好，今天做三角函數時一直把對邊、鄰邊弄混，越寫越焦慮。",
+        inputType: "text" as const,
+    },
+    {
+        mood: 3, stress: 7, sleep: 5, energy: 2,
+        note: "模擬考範圍很多，今天覺得事情堆在一起。先把最不熟的 sin、cos 題目圈起來了。",
+        inputType: "text" as const,
+    },
+    {
+        mood: 4, stress: 6, sleep: 6, energy: 3,
+        note: "今天有照計畫拆成幾小段複習，雖然壓力還在，但比較沒有完全卡住。",
+        inputType: "voice" as const,
+    },
+    {
+        mood: 4, stress: 5, sleep: 7, energy: 4,
+        note: "睡飽一點後狀態有比較好，三角函數基本題可以慢慢判斷出對邊和鄰邊。",
+        inputType: "text" as const,
+    },
+    {
+        mood: 5, stress: 4, sleep: 8, energy: 4,
+        note: "今天讀書效率不錯，完成原本安排的兩個章節，也有留時間休息。",
+        inputType: "text" as const,
+    },
+    {
+        mood: 4, stress: 5, sleep: 7, energy: 4,
+        note: "開始整理模擬考複習清單，事情很多但列出來之後比較知道下一步要做什麼。",
+        inputType: "voice" as const,
+    },
+    {
+        mood: 4, stress: 6, sleep: 6, energy: 3,
+        note: "今天開始做數學錯題本，發現自己三角函數最常錯在判斷邊的位置。",
+        inputType: "text" as const,
+    },
+    {
+        mood: 3, stress: 6, sleep: 5, energy: 3,
+        note: "這週讀書時間變多，晚上有點晚睡。希望把作息調回來，不然白天很容易沒精神。",
+        inputType: "text" as const,
+    },
+    {
+        mood: 4, stress: 5, sleep: 6, energy: 3,
+        note: "開始準備模擬考，還在排複習進度。現在最擔心的是數學和時間分配。",
+        inputType: "voice" as const,
+    },
+    {
+        mood: 4, stress: 4, sleep: 7, energy: 4,
+        note: "今天把接下來兩週的複習範圍列好了，先從比較不熟的章節開始。",
+        inputType: "text" as const,
+    },
+];
+
+function toLocalDateKey(date: Date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+}
+
+function buildRecordingDemoRecords(userId: string): CheckinRecord[] {
+    return recordingDemoTemplates.map((template, index) => {
+        const date = new Date();
+        date.setHours(20, 30 - (index % 4) * 5, 0, 0);
+        date.setDate(date.getDate() - index);
+
+        const dateKey = toLocalDateKey(date);
+
+        return {
+            checkin_id: `demo-history-${dateKey}`,
+            user_id: userId,
+            mood_score: template.mood,
+            stress_score: template.stress,
+            sleep_score: template.sleep,
+            energy_score: template.energy,
+            note: template.note,
+            input_type: template.inputType,
+            checkin_date: dateKey,
+            created_at: date.toISOString(),
+        };
+    });
+}
+
+function mergeRecordingDemoRecords(
+    realRecords: CheckinRecord[],
+    userId: string
+): CheckinRecord[] {
+    const realByDate = new Map(
+        realRecords.map((record) => [
+            record.checkin_date.slice(0, 10),
+            record,
+        ])
+    );
+
+    return buildRecordingDemoRecords(userId).map(
+        (demoRecord) =>
+            realByDate.get(demoRecord.checkin_date) ?? demoRecord
+    );
+}
+
 function getMoodInfo(score: number | null) {
     return moodOptions.find(
         (item) => item.value === score
@@ -130,6 +250,12 @@ function calculateAverage(
 }
 
 function History() {
+    const isRecordingDemo = useMemo(
+        () =>
+            new URLSearchParams(window.location.search).get("demo") === "1",
+        []
+    );
+
     const [records, setRecords] =
         useState<CheckinRecord[]>([]);
 
@@ -704,9 +830,24 @@ function History() {
 
             setRecords(loadedRecords);
 
-            await loadAnalysis(
-                loadedRecords
-            );
+            if (isRecordingDemo) {
+                setSummaryState(
+                    "近期狀態有些起伏，模擬考準備讓壓力偏高，但睡眠與能量正在逐步回穩。"
+                );
+                setAiInsight(
+                    "最近兩週的紀錄顯示，壓力在模擬考與三角函數複習期間明顯升高；當睡眠回到 6～8 分、並把題目拆成小段練習時，心情和能量也跟著改善。"
+                );
+                setXaiReason(
+                    "這段整理來自最近 14 天的心情、壓力、睡眠與能量變化，以及多次出現的模擬考、三角函數與晚睡紀錄。"
+                );
+                setAttributionText(
+                    "近期壓力主要與模擬考準備、數學三角函數卡關和睡眠不足同時出現。"
+                );
+            } else {
+                await loadAnalysis(
+                    loadedRecords
+                );
+            }
         } catch (error) {
             console.error(
                 "History load error:",
@@ -727,6 +868,18 @@ function History() {
         void restoreSocraticConversation(false);
         void loadRecords();
     }, []);
+
+    const displayRecords = useMemo(() => {
+        if (!isRecordingDemo) {
+            return records;
+        }
+
+        const userId =
+            localStorage.getItem("mindbridge_user_id") ||
+            "recording-demo-user";
+
+        return mergeRecordingDemoRecords(records, userId);
+    }, [records, isRecordingDemo]);
 
     /*
      * 產生最近 14 個日曆日
@@ -766,7 +919,7 @@ function History() {
                     `${year}-${month}-${day}`;
 
                 const record =
-                    records.find(
+                    displayRecords.find(
                         (item) =>
                             item.checkin_date
                                 .slice(0, 10) === key
@@ -795,17 +948,19 @@ function History() {
         );
 
         return days;
-    }, [records]);
+    }, [displayRecords]);
 
     const displayChartData =
-        records.length >= 5
+        isRecordingDemo
             ? chartData
-            : mockTrendData;
+            : records.length >= 5
+                ? chartData
+                : mockTrendData;
 
     const recent14Records =
         useMemo(
             () =>
-                records
+                displayRecords
                     .filter((record) => {
                         const recordDate =
                             new Date(
@@ -834,7 +989,7 @@ function History() {
                         );
                     })
                     .slice(0, 14),
-            [records]
+            [displayRecords]
         );
 
     const averageMood =
@@ -1137,7 +1292,7 @@ function History() {
                         Check-in 整理成比較容易看懂的變化。
                     </p>
 
-                    {records.length < 5 && (
+                    {!isRecordingDemo && records.length < 5 && (
                         <p className="mt-2 text-xs text-amber-600">
                             目前紀錄較少，圖表以展示資料呈現；累積更多 Check-in 後會自動切換為你的實際紀錄。
                         </p>
@@ -1664,7 +1819,7 @@ function History() {
                             </h2>
 
                             <p className="mt-1 text-sm text-slate-500">
-                                共 {records.length} 筆
+                                共 {displayRecords.length} 筆
                             </p>
                         </div>
 
@@ -1676,7 +1831,7 @@ function History() {
                         </Link>
                     </div>
 
-                    {records.length === 0 ? (
+                    {displayRecords.length === 0 ? (
                         <div className="rounded-3xl bg-white p-10 text-center shadow-sm ring-1 ring-slate-200">
                             <div className="text-4xl">
                                 🌱
@@ -1692,7 +1847,7 @@ function History() {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {records.map(
+                            {displayRecords.map(
                                 (record) => {
                                     const mood =
                                         getMoodInfo(
@@ -1707,6 +1862,11 @@ function History() {
                                     const editing =
                                         editingId ===
                                         record.checkin_id;
+
+                                    const isDemoRecord =
+                                        record.checkin_id.startsWith(
+                                            "demo-history-"
+                                        );
 
                                     return (
                                         <article
@@ -1740,7 +1900,7 @@ function History() {
                                                     </p>
                                                 </div>
 
-                                                {!editing && (
+                                                {!editing && !isDemoRecord && (
                                                     <div className="flex gap-2">
                                                         <button
                                                             type="button"
