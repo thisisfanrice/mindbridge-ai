@@ -49,6 +49,34 @@ function calculateCurrentStreak(records: Array<{ checkin_date?: string }>) {
 }
 
 function Home() {
+  const [recordingDemo, setRecordingDemo] = useState(() => {
+    const queryValue = new URLSearchParams(window.location.search).get("demo");
+
+    if (queryValue === "1") {
+      return true;
+    }
+
+    if (queryValue === "0") {
+      return false;
+    }
+
+    return localStorage.getItem("mindbridge_recording_demo") === "1";
+  });
+
+  useEffect(() => {
+    const queryValue = new URLSearchParams(window.location.search).get("demo");
+
+    if (queryValue === "1") {
+      localStorage.setItem("mindbridge_recording_demo", "1");
+      setRecordingDemo(true);
+    } else if (queryValue === "0") {
+      localStorage.removeItem("mindbridge_recording_demo");
+      setRecordingDemo(false);
+    }
+  }, []);
+
+  const historyTarget = recordingDemo ? "/history?demo=1" : "/history";
+
   const navigate = useNavigate();
   const [checkingUser, setCheckingUser] = useState(true);
   const [setupError, setSetupError] = useState("");
@@ -269,7 +297,7 @@ function Home() {
               </Link>
 
               <Link
-                to="/history"
+                to={historyTarget}
                 className="rounded-xl border border-slate-300 bg-white px-6 py-3 text-center font-semibold text-slate-700"
               >
                 查看狀態趨勢
@@ -345,7 +373,7 @@ function Home() {
 
             {/* 智慧狀態洞察 */}
             <Link
-              to="/history"
+              to={historyTarget}
               className="group rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 transition duration-200 hover:-translate-y-1 hover:shadow-md hover:ring-indigo-200 sm:col-span-2"
             >
               <div className="mb-4 flex items-start justify-between">

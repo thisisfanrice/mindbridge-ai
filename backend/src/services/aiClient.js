@@ -1,4 +1,4 @@
-const AI_MODE = process.env.AI_MODE || "demo";
+﻿const AI_MODE = process.env.AI_MODE || "demo";
 
 // 統一提問結尾。空字串保留空白，避免替已結束的對話產生問題。
 function normalizeQuestion(value) {
@@ -25,12 +25,30 @@ function getDemoStage1() {
 }
 
 function getDemoStage2(payload) {
+  const turn = Number(payload?.conversation_turn || 0);
+
+  if (turn <= 1) {
+    return {
+      safety_escalation: false,
+      message:
+        "我有收到你的回答，我們先把壓力背後最明顯的想法抓出來。",
+      question: normalizeQuestion(
+        "當這件事讓你壓力變大時，你腦中最常冒出的想法是什麼？"
+      ),
+      conversation_end: false,
+      xai_reason:
+        "Demo 規則式回覆：目前僅提供固定的反思引導，未進行 AI 語意分析或安全風險判斷。",
+      conversation_id: payload.conversation_id ?? null,
+      demo_mode: true,
+    };
+  }
+
   return {
     safety_escalation: false,
     message:
-      "我有收到你的回答，我們可以再把這個想法拆開看看。",
+      "你已經把原本的想法說得更清楚了，我們再換一個角度看看。",
     question: normalizeQuestion(
-      "你覺得這個想法裡，還有沒有其他可能的解釋？"
+      "如果要把這個想法改成對自己更公平一點的說法，你會怎麼重新描述？"
     ),
     conversation_end: false,
     xai_reason:

@@ -250,11 +250,25 @@ function calculateAverage(
 }
 
 function History() {
-    const isRecordingDemo = useMemo(
-        () =>
-            new URLSearchParams(window.location.search).get("demo") === "1",
-        []
-    );
+    const isRecordingDemo = useMemo(() => {
+        const queryValue = new URLSearchParams(window.location.search).get(
+            "demo"
+        );
+
+        if (queryValue === "1") {
+            localStorage.setItem("mindbridge_recording_demo", "1");
+            return true;
+        }
+
+        if (queryValue === "0") {
+            localStorage.removeItem("mindbridge_recording_demo");
+            return false;
+        }
+
+        return (
+            localStorage.getItem("mindbridge_recording_demo") === "1"
+        );
+    }, []);
 
     const [records, setRecords] =
         useState<CheckinRecord[]>([]);
@@ -1432,7 +1446,7 @@ function History() {
                                         </p>
 
                                         <p className="mt-1 text-sm text-slate-500">
-                                            用一個問題，幫你把現在最卡住的地方整理清楚。
+                                            用幾個循序問題，幫你把現在最卡住的地方整理清楚。
                                         </p>
                                     </div>
 

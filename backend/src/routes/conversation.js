@@ -1,4 +1,4 @@
-const express = require("express");
+﻿const express = require("express");
 const router = express.Router();
 const { callStage2 } = require("../services/aiClient");
 const pool = require("../db");
@@ -10,7 +10,7 @@ function isValidUuid(value) {
     );
 }
 
-const DEMO_MAX_TURNS = 2;
+const DEMO_MAX_TURNS = 3;
 
 function getDemoFinalResponse() {
     return {
@@ -22,7 +22,7 @@ function getDemoFinalResponse() {
             "花約 5 分鐘，把目前最掛心的事情分成「現在能做」和「之後再處理」，選一件小事作為下一步。",
         conversation_end: true,
         xai_reason:
-            "Demo 規則式收斂：已完成預設的兩輪反思。此內容並非根據語意分析產生，也不代表系統已評估個人狀態。",
+            "Demo 規則式收斂：已完成預設的三輪反思。此內容並非根據語意分析產生，也不代表系統已評估個人狀態。",
         demo_mode: true,
     };
 }
@@ -164,7 +164,7 @@ router.post("/", async (req, res) => {
             conversation_turn: conversationTurn,
         });
 
-        // Demo：回答兩輪後進入收斂。
+        // Demo：回答三輪後進入收斂。
         if (
             aiResponse.demo_mode === true &&
             conversationTurn >= DEMO_MAX_TURNS &&
