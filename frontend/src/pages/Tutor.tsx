@@ -22,6 +22,7 @@ type TutorCache = {
     aiMessage: string;
     aiQuestion: string;
     tutorStage: "idle" | "question" | "complete";
+    tutorRound: 1 | 2;
     tutorDemoMode: boolean;
     inputType: "text" | "voice";
     studyGoal: string;
@@ -96,6 +97,7 @@ function readTutorCache(userId: string): TutorCache | null {
                     ? data.aiQuestion
                     : "",
             tutorStage: stage as TutorCache["tutorStage"],
+            tutorRound: data.tutorRound === 2 ? 2 : 1,
             tutorDemoMode: data.tutorDemoMode === true,
             inputType: input as TutorCache["inputType"],
             studyGoal:
@@ -205,6 +207,7 @@ function Tutor() {
     const [tutorAnswer, setTutorAnswer] = useState("");
     const [microPracticeCompleted, setMicroPracticeCompleted] = useState(false);
     const [tutorStage, setTutorStage] = useState<"idle" | "question" | "complete">("idle");
+    const [tutorRound, setTutorRound] = useState<1 | 2>(1);
     const [tutorDemoMode, setTutorDemoMode] = useState(false);
     const [postureState, setPostureState] = useState<"listening" | "tutoring" | null>(null);
     const [listening, setListening] = useState(false);
@@ -236,6 +239,7 @@ function Tutor() {
         setAiMessage("");
         setAiQuestion("");
         setTutorStage("idle");
+        setTutorRound(1);
         setTutorDemoMode(false);
         setPostureState(null);
         setInputType("text");
@@ -346,6 +350,7 @@ function Tutor() {
             setAiMessage(cached.aiMessage);
             setAiQuestion(cached.aiQuestion);
             setTutorStage(cached.tutorStage);
+            setTutorRound(cached.tutorRound);
             setTutorDemoMode(cached.tutorDemoMode);
             setInputType(cached.inputType);
             setStudyGoal(cached.studyGoal);
@@ -376,6 +381,7 @@ function Tutor() {
             aiMessage,
             aiQuestion,
             tutorStage,
+            tutorRound,
             tutorDemoMode,
             inputType,
             studyGoal,
@@ -398,6 +404,7 @@ function Tutor() {
         aiMessage,
         aiQuestion,
         tutorStage,
+        tutorRound,
         tutorDemoMode,
         inputType,
         studyGoal,
@@ -488,6 +495,7 @@ function Tutor() {
             setAiQuestion(data.question);
             setTutorDemoMode(data.demo_mode);
             setPostureState(data.posture_state);
+            setTutorRound(1);
             setTutorStage(data.conversation_end ? "complete" : "question");
         } catch (error) {
             if (requestId !== requestIdRef.current) return;
@@ -523,7 +531,7 @@ function Tutor() {
                     body: JSON.stringify({
                         message: answer,
                         input_type: inputType,
-                        stage: "followup",
+                        stage: tutorRound === 1 ? "followup" : "followup2",
                         subject,
                         original_question: submittedQuestion,
                         tutor_question: aiQuestion,
@@ -550,6 +558,11 @@ function Tutor() {
             setAiQuestion(data.question);
             setTutorDemoMode(data.demo_mode);
             setPostureState(data.posture_state);
+
+            if (!data.conversation_end && tutorRound === 1) {
+                setTutorRound(2);
+            }
+
             setTutorStage(
                 data.conversation_end ? "complete" : "question"
             );
@@ -798,9 +811,14 @@ function Tutor() {
                                 )}
                                 {tutorStage === "question" && (
                                     <div className="mt-4">
-                                        <label htmlFor="tutor-answer" className="block text-sm font-semibold text-slate-700">
-                                            說說你的想法
-                                        </label>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <label htmlFor="tutor-answer" className="block text-sm font-semibold text-slate-700">
+                                                說說你的想法
+                                            </label>
+                                            <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                                                引導第 {tutorRound} / 2 輪
+                                            </span>
+                                        </div>
                                         <textarea
                                             id="tutor-answer"
                                             value={tutorAnswer}

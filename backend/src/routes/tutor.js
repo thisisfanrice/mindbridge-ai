@@ -34,10 +34,10 @@ router.post("/", async (req, res) => {
             });
         }
 
-        if (!["start", "followup"].includes(stage)) {
+        if (!["start", "followup", "followup2"].includes(stage)) {
             return res.status(400).json({
                 success: false,
-                message: "stage must be start or followup",
+                message: "stage must be start, followup, or followup2",
             });
         }
 
@@ -53,17 +53,40 @@ router.post("/", async (req, res) => {
         let tutorResponse = await callTutor(payload);
 
         /*
-         * Demo 第 2 輪固定收斂，不宣稱判斷答案正確與否。
-         * External 模式則由外部 Tutor API 決定是否繼續提問或結束。
+         * 錄影 Demo 固定為三輪：
+         * start -> 第一個引導問題
+         * followup -> 第二個引導問題
+         * followup2 -> 收斂
+         * External 模式仍由外部 Tutor API 決定流程。
          */
-        if (stage === "followup" && tutorResponse.demo_mode === true) {
-            tutorResponse = {
-                message:
-                    "謝謝你把目前想到的方式說出來。可以先對照課本、例題或老師提供的解法，確認自己的理解，再把還不確定的地方記下來。",
-                question: "",
-                conversation_end: true,
-                demo_mode: true,
-            };
+        if (tutorResponse.demo_mode === true) {
+            if (stage === "start") {
+                tutorResponse = {
+                    message:
+                        "三角函數剛開始最容易卡在斜邊、對邊、鄰邊的判斷。先不要一次背全部，我們先只找最容易辨認的一條。",
+                    question:
+                        "在直角三角形裡，最長而且正對直角的那一邊叫什麼？",
+                    conversation_end: false,
+                    demo_mode: true,
+                };
+            } else if (stage === "followup") {
+                tutorResponse = {
+                    message:
+                        "先找到斜邊之後，剩下兩條邊就可以依照題目指定的角來分。",
+                    question:
+                        "如果題目指定一個角，正對這個角的邊叫什麼？貼著這個角、但不是斜邊的又叫什麼？",
+                    conversation_end: false,
+                    demo_mode: true,
+                };
+            } else if (stage === "followup2") {
+                tutorResponse = {
+                    message:
+                        "可以把判斷順序整理成三步：先找斜邊，再依指定角分出對邊和鄰邊，最後才套 sin＝對邊／斜邊、cos＝鄰邊／斜邊。這樣比較不容易把兩個公式混在一起。",
+                    question: "",
+                    conversation_end: true,
+                    demo_mode: true,
+                };
+            }
         }
 
         return res.status(200).json({
